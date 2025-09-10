@@ -1,0 +1,445 @@
+basePath: /
+definitions:
+  handlers.ConsentsUpsertRequest:
+    properties:
+      consent_data_processing:
+        type: boolean
+      consent_data_processing_date:
+        type: string
+      consent_internet_access:
+        type: boolean
+      consent_internet_access_date:
+        type: string
+      consent_photo_publication:
+        type: boolean
+      consent_photo_publication_date:
+        type: string
+      student_id:
+        type: integer
+    type: object
+  handlers.ContactAddRequest:
+    properties:
+      full_name:
+        type: string
+      phone:
+        type: string
+      relation:
+        type: string
+      student_id:
+        type: integer
+    type: object
+  handlers.CreateIDResponse:
+    properties:
+      id:
+        type: integer
+    type: object
+  handlers.CreateStudentCoreRequest:
+    properties:
+      admission_year:
+        type: integer
+      birth_date:
+        description: YYYY-MM-DD
+        type: string
+      citizenship:
+        type: string
+      class_label:
+        type: string
+      fact_address:
+        type: string
+      first_name:
+        type: string
+      gender:
+        type: string
+      last_name:
+        type: string
+      middle_name:
+        type: string
+      reg_address:
+        type: string
+      school_id:
+        type: integer
+      status:
+        type: string
+      student_email:
+        type: string
+      student_number:
+        type: string
+      student_phone:
+        type: string
+    type: object
+  handlers.DocumentsUpsertRequest:
+    properties:
+      birth_certificate:
+        type: string
+      birth_date:
+        type: string
+      passport_number:
+        type: string
+      passport_series:
+        type: string
+      snils:
+        type: string
+      student_id:
+        type: integer
+    type: object
+  handlers.MedicalUpsertRequest:
+    properties:
+      activities:
+        type: string
+      allergies:
+        type: string
+      benefits:
+        type: string
+      health_group:
+        type: integer
+      medical_notes:
+        type: string
+      student_id:
+        type: integer
+    type: object
+  handlers.OkResponse:
+    properties:
+      status:
+        example: ok
+        type: string
+    type: object
+  handlers.StudentListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/models.StudentListItem'
+        type: array
+      limit:
+        example: 50
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      total:
+        example: 1
+        type: integer
+    type: object
+  handlers.UpdateStudentCoreRequest:
+    properties:
+      admission_year:
+        type: integer
+      birth_date:
+        description: YYYY-MM-DD
+        type: string
+      citizenship:
+        type: string
+      class_label:
+        type: string
+      fact_address:
+        type: string
+      first_name:
+        type: string
+      gender:
+        type: string
+      last_name:
+        type: string
+      middle_name:
+        type: string
+      reg_address:
+        type: string
+      school_id:
+        type: integer
+      status:
+        type: string
+      student_email:
+        type: string
+      student_number:
+        type: string
+      student_phone:
+        type: string
+    type: object
+  models.Gender:
+    enum:
+    - m
+    - f
+    type: string
+    x-enum-varnames:
+    - GenderMale
+    - GenderFemale
+  models.StudentListItem:
+    properties:
+      admission_year:
+        type: integer
+      birth_date:
+        type: string
+      class_label:
+        type: string
+      created_at:
+        type: string
+      full_name:
+        type: string
+      gender:
+        $ref: '#/definitions/models.Gender'
+      id:
+        type: integer
+      school_id:
+        type: integer
+      status:
+        $ref: '#/definitions/models.StudentStatus'
+      student_number:
+        type: string
+    type: object
+  models.StudentStatus:
+    enum:
+    - enrolled
+    - transferred
+    - graduated
+    - expelled
+    type: string
+    x-enum-varnames:
+    - StatusEnrolled
+    - StatusTransferred
+    - StatusGraduated
+    - StatusExpelled
+host: localhost:8080
+info:
+  contact:
+    email: admin@example.com
+    name: EduBase Team
+  description: Внутренний API школьной базы (ученики, документы, медицина, согласия,
+    контакты).
+  title: EduBase API
+  version: "1.0"
+paths:
+  /api/students:
+    get:
+      description: Список учеников с фильтрами и пагинацией
+      parameters:
+      - description: Поиск по ФИО (ILIKE)
+        in: query
+        name: q
+        type: string
+      - description: ID школы
+        in: query
+        name: school_id
+        type: integer
+      - description: Класс (например 7А)
+        in: query
+        name: class
+        type: string
+      - description: enrolled|transferred|graduated|expelled
+        in: query
+        name: status
+        type: string
+      - description: Год поступления с
+        in: query
+        name: admission_year_from
+        type: integer
+      - description: Год поступления по
+        in: query
+        name: admission_year_to
+        type: integer
+      - description: Дата рождения c (YYYY-MM-DD)
+        in: query
+        name: birth_date_from
+        type: string
+      - description: Дата рождения по (YYYY-MM-DD)
+        in: query
+        name: birth_date_to
+        type: string
+      - default: 50
+        description: Лимит
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Смещение
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.StudentListResponse'
+      summary: List students
+      tags:
+      - Students
+    post:
+      consumes:
+      - application/json
+      description: Создать базовую карточку ученика (А+Б+В)
+      parameters:
+      - description: Core payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateStudentCoreRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateIDResponse'
+        "422":
+          description: validation error
+          schema:
+            type: string
+      summary: Create student core
+      tags:
+      - Students
+  /api/students/{id}:
+    patch:
+      consumes:
+      - application/json
+      description: Частичное/полное обновление базовой карточки (в текущей реализации
+        как PUT)
+      parameters:
+      - description: Student ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Core payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateStudentCoreRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.OkResponse'
+        "422":
+          description: validation error
+          schema:
+            type: string
+      summary: Update student core (PATCH)
+      tags:
+      - Students
+  /api/students/{id}/contacts:
+    post:
+      consumes:
+      - application/json
+      description: Добавить экстренный контакт к ученику
+      parameters:
+      - description: Student ID (в URL)
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Contact payload (содержит student_id)
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ContactAddRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateIDResponse'
+      summary: Add emergency contact
+      tags:
+      - Contacts
+  /api/students/consents:
+    put:
+      consumes:
+      - application/json
+      description: Обновить/создать согласия (ПДн, фото, интернет)
+      parameters:
+      - description: Consents payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ConsentsUpsertRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.OkResponse'
+        "422":
+          description: validation error
+          schema:
+            type: string
+      summary: Upsert consents
+      tags:
+      - Consents
+  /api/students/contacts/{id}:
+    delete:
+      description: Удалить экстренный контакт по ID
+      parameters:
+      - description: Contact ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.OkResponse'
+      summary: Delete emergency contact
+      tags:
+      - Contacts
+  /api/students/docs:
+    put:
+      consumes:
+      - application/json
+      description: Обновить/создать документы ученика (СНИЛС обязателен; паспорт обязателен
+        с 14 лет и 1 месяц, иначе — свидетельство)
+      parameters:
+      - description: Documents payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.DocumentsUpsertRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.OkResponse'
+        "422":
+          description: validation error
+          schema:
+            type: string
+      summary: Upsert documents
+      tags:
+      - Documents
+  /api/students/medical:
+    put:
+      consumes:
+      - application/json
+      description: Обновить/создать мед.данные/льготы/кружки
+      parameters:
+      - description: Medical payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.MedicalUpsertRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.OkResponse'
+      summary: Upsert medical
+      tags:
+      - Medical
+schemes:
+- http
+swagger: "2.0"

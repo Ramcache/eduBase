@@ -1,0 +1,48 @@
+# Go build artifacts
+/bin/
+/build/
+/dist/
+/out/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.coverprofile
+coverage.*
+profile.cov
+
+# Dependencies (если используешь vendor)
+vendor/
+
+# Logs / temp
+*.log
+*.tmp
+tmp/
+*.swp
+
+# IDE
+.idea/
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Databases / local volumes
+pgdata/
+docker-data/
+
+# Generated files you don't want to track
+*.xlsx
+
+# Swagger docs — ВНИМАНИЕ:
+# НЕ игнорируем ./docs/, т.к. проект импортирует пакет docs.
+# Если хочешь не коммитить docs — убери импорт _ "eduBase/docs"
+# и генерируй docs на этапе сборки.
