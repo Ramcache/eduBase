@@ -21,7 +21,7 @@ jobs:
       - name: 🔨 Build binary
         run: |
           mkdir -p build
-          go build -o build/main ./app
+          go build -o build/main ./cmd/api
 
       - name: 📤 Upload files
         uses: appleboy/scp-action@v0.1.7

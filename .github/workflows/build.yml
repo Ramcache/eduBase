@@ -18,7 +18,7 @@ jobs:
       - name: 🛠 Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.25'
 
       - name: 📦 Cache Go modules
         uses: actions/cache@v3
@@ -35,4 +35,5 @@ jobs:
 
       - name: 🔨 Build binary
         run: |
-          go build -o build/main ./app
+          mkdir -p build
+          go build -o build/main ./cmd/api
