@@ -39,8 +39,6 @@ Thumbs.db
 pgdata/
 docker-data/
 
-# Generated files you don't want to track
-*.xlsx
 
 # Swagger docs — ВНИМАНИЕ:
 # НЕ игнорируем ./docs/, т.к. проект импортирует пакет docs.

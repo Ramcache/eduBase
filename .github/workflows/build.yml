@@ -1,0 +1,39 @@
+name: 🛠 Build & Test Go App
+
+on:
+  push:
+    branches:
+      - dev
+      - feature/**
+      - fix/**
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+
+      - name: 📦 Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: ✅ Run tests
+        run: go test ./... -v
+
+      - name: 🔨 Build binary
+        run: |
+          mkdir -p build
+          go build -o build/main ./cmd/api

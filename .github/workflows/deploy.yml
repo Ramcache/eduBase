@@ -1,0 +1,52 @@
+name: 🚀 Deploy Go App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠 Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: 🔨 Build binary
+        run: |
+          mkdir -p build
+          go build -o build/main ./cmd/api
+
+      - name: 📤 Upload files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "build/main,migrations"
+          target: /eduBase/
+
+      - name: 🧬 Run migrations & restart app
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /eduBase
+
+            echo "⏫ Running Goose migrations..."
+            /root/go/bin/goose -dir ./migrations postgres "${{ secrets.DB_URL }}" up
+
+            echo "🔁 Restarting app..."
+            pkill -f main || true
+            mkdir -p logs
+            nohup ./main > logs/app_$(date +%F).log 2>&1 &
+            sleep 5
+            curl -f http://localhost:8080/health || (echo "❌ App failed to start" && exit 1)
