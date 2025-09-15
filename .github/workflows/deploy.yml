@@ -50,3 +50,12 @@ jobs:
             nohup ./main > logs/app_$(date +%F).log 2>&1 &
             sleep 5
             curl -f http://localhost:8080/health || (echo "❌ App failed to start" && exit 1)
+      - name: 🐘 Restart Postgres
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            sudo systemctl restart postgresql@16-main
+            sudo systemctl status postgresql@16-main --no-pager

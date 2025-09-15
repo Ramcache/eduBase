@@ -62,7 +62,7 @@ func NewRouter(cfg *config.Config, db *pgxpool.Pool) *chi.Mux {
 	impH := handlers.NewImportHandler(svc)
 
 	// routes
-	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(200)
 		_, _ = w.Write([]byte("ok"))
 	})
