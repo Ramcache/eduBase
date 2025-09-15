@@ -47,9 +47,10 @@ jobs:
             echo "🔁 Restarting app..."
             pkill -f main || true
             mkdir -p logs
-            nohup ./main > logs/app_$(date +%F).log 2>&1 &
+            nohup ./build/main > logs/app_$(date +%F).log 2>&1 &
             sleep 5
             curl -f http://localhost:8080/health || (echo "❌ App failed to start" && exit 1)
+
       - name: 🐘 Restart Postgres
         uses: appleboy/ssh-action@v1.0.3
         with:
