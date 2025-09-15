@@ -29,7 +29,7 @@ func BuildStudentsWorkbook(items []models.StudentListItem) (*excelize.File, erro
 		_ = f.SetCellInt(sheet, cell(row, 1), int64(it.ID)) // int
 		_ = f.SetCellStr(sheet, cell(row, 2), it.StudentNumber)
 		_ = f.SetCellStr(sheet, cell(row, 3), it.FullName)
-		_ = f.SetCellStr(sheet, cell(row, 4), it.BirthDate.Format("2006-01-02"))
+		_ = f.SetCellStr(sheet, cell(row, 4), it.BirthDate.Format("02.01.2006"))
 		_ = f.SetCellStr(sheet, cell(row, 5), string(it.Gender))
 		_ = f.SetCellInt(sheet, cell(row, 6), int64(it.SchoolID)) // int
 		_ = f.SetCellStr(sheet, cell(row, 7), it.ClassLabel)

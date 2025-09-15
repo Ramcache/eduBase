@@ -2,6 +2,7 @@ package excel
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -52,7 +53,7 @@ func parseStudentsSheetWithInlineContacts(f *excelize.File) ([]service.ImportStu
 			LastName:            strings.TrimSpace(r[1]),
 			FirstName:           strings.TrimSpace(r[2]),
 			MiddleName:          optStr(r[3]),
-			BirthDate:           strings.TrimSpace(r[4]),
+			BirthDate:           canonDateLoose(r[4]),
 			Gender:              normalizeGender(r[5]),
 			Citizenship:         optStr(r[6]),
 			SchoolID:            mustAtoi(r[7]),
@@ -73,11 +74,11 @@ func parseStudentsSheetWithInlineContacts(f *excelize.File) ([]service.ImportStu
 			Allergies:           optStr(r[22]),
 			Activities:          optStr(r[23]),
 			ConsentPD:           optBool(r[24]),
-			ConsentPDDate:       optStr(r[25]),
+			ConsentPDDate:       canonDatePtrLoose(r[25]),
 			ConsentPhoto:        optBool(r[26]),
-			ConsentPhotoDate:    optStr(r[27]),
+			ConsentPhotoDate:    canonDatePtrLoose(r[27]),
 			ConsentInternet:     optBool(r[28]),
-			ConsentInternetDate: optStr(r[29]),
+			ConsentInternetDate: canonDatePtrLoose(r[29]),
 		}
 		out = append(out, item)
 
@@ -256,4 +257,66 @@ func in(s string, opts ...string) bool {
 		}
 	}
 	return false
+}
+
+// canonDateLoose: принимает "DD.MM.YYYY" / "YYYY-MM-DD" / "DD-MM-YYYY" → возвращает ISO "YYYY-MM-DD".
+// Если распознать не удалось, вернёт исходную строку (валидатор потом скажет ошибку).
+func canonDateLoose(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+
+	s = strings.ReplaceAll(s, "/", ".")
+	// DD.MM.YYYY
+	if strings.Contains(s, ".") {
+		parts := strings.Split(s, ".")
+		if len(parts) == 3 {
+			d, derr := strconv.Atoi(strings.TrimSpace(parts[0]))
+			m, merr := strconv.Atoi(strings.TrimSpace(parts[1]))
+			y, yerr := strconv.Atoi(strings.TrimSpace(parts[2]))
+			if derr == nil && merr == nil && yerr == nil && y > 0 && m >= 1 && m <= 12 && d >= 1 && d <= 31 {
+				return fmt.Sprintf("%04d-%02d-%02d", y, m, d)
+			}
+		}
+		return s
+	}
+	// YYYY-MM-DD  или  DD-MM-YYYY
+	if strings.Contains(s, "-") {
+		parts := strings.Split(s, "-")
+		if len(parts) == 3 {
+			a := strings.TrimSpace(parts[0])
+			b := strings.TrimSpace(parts[1])
+			c := strings.TrimSpace(parts[2])
+			// если первый сегмент длиной 4 — это ISO
+			if len(a) == 4 {
+				return fmt.Sprintf("%s-%02s-%02s", a, pad2(b), pad2(c))
+			}
+			// иначе считаем DD-MM-YYYY
+			d, derr := strconv.Atoi(a)
+			m, merr := strconv.Atoi(b)
+			y, yerr := strconv.Atoi(c)
+			if derr == nil && merr == nil && yerr == nil && y > 0 {
+				return fmt.Sprintf("%04d-%02d-%02d", y, m, d)
+			}
+		}
+	}
+	return s
+}
+
+func canonDatePtrLoose(s string) *string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	iso := canonDateLoose(s)
+	return &iso
+}
+
+func pad2(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) == 1 {
+		return "0" + s
+	}
+	return s
 }

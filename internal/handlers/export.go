@@ -26,8 +26,8 @@ func NewExportHandler(s service.StudentService) *ExportHandler { return &ExportH
 @Param        status                query    string  false  "enrolled|transferred|graduated|expelled"
 @Param        admission_year_from   query    int     false  "Год поступления с"
 @Param        admission_year_to     query    int     false  "Год поступления по"
-@Param        birth_date_from       query    string  false  "Дата рождения c (YYYY-MM-DD)"
-@Param        birth_date_to         query    string  false  "Дата рождения по (YYYY-MM-DD)"
+@Param        birth_date_from       query    string  false  "Дата рождения c (DD-MM-YYYY)"
+@Param        birth_date_to         query    string  false  "Дата рождения по (DD-MM-YYYY)"
 @Success      200  {file}  file  "Excel file"
 @Router       /api/students/export.xlsx [get]
 */
@@ -92,7 +92,7 @@ func parseDatePtr(s string) *time.Time {
 	if s == "" {
 		return nil
 	}
-	t, err := time.Parse("2006-01-02", s)
+	t, err := time.Parse("02.01.2006", s)
 	if err != nil {
 		return nil
 	}

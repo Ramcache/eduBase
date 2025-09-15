@@ -52,7 +52,7 @@ func BuildStudentsWorkbookFull(
 		_ = f.SetCellStr(main, cell(row, 3), st.LastName)
 		_ = f.SetCellStr(main, cell(row, 4), st.FirstName)
 		_ = f.SetCellStr(main, cell(row, 5), strPtr(st.MiddleName))
-		_ = f.SetCellStr(main, cell(row, 6), st.BirthDate.Format("2006-01-02"))
+		_ = f.SetCellStr(main, cell(row, 6), st.BirthDate.Format("02.01.2006"))
 		_ = f.SetCellStr(main, cell(row, 7), string(st.Gender))
 		_ = f.SetCellStr(main, cell(row, 8), strPtr(st.Citizenship))
 		_ = f.SetCellInt(main, cell(row, 9), int64(st.SchoolID))

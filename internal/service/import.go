@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
-	"time"
-
 	"eduBase/internal/validators"
+	"errors"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type ImportStudent struct {
@@ -13,7 +15,7 @@ type ImportStudent struct {
 	LastName      string
 	FirstName     string
 	MiddleName    *string
-	BirthDate     string // YYYY-MM-DD
+	BirthDate     string
 	Gender        string
 	Citizenship   *string
 	SchoolID      int
@@ -90,9 +92,9 @@ func (s *studentService) Import(ctx context.Context, rows []ImportStudent, conta
 			results = append(results, res)
 			continue
 		}
-		bd, err := time.Parse("2006-01-02", r.BirthDate)
+		bd, err := parseDateLooseToTime(r.BirthDate)
 		if err != nil {
-			msg := "birth_date формат YYYY-MM-DD"
+			msg := "birth_date: ожидаю ДД.ММ.ГГГГ или YYYY-MM-DD (также принимаю DD-MM-YYYY и excel-число)"
 			res.Error = &msg
 			results = append(results, res)
 			continue
@@ -267,4 +269,81 @@ func derefStr(p *string) string {
 		return ""
 	}
 	return *p
+}
+
+// parseDateLooseToTime — понимает DD.MM.YYYY / YYYY-MM-DD / DD-MM-YYYY,
+// варианты с временем, "г.", Excel serial number и однозначные день/месяц.
+func parseDateLooseToTime(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}, errors.New("empty date")
+	}
+
+	// Excel serial number (пример: 45565)
+	if isAllDigits(s) {
+		if v, err := strconv.Atoi(s); err == nil && v > 20000 && v < 100000 {
+			base := time.Date(1899, 12, 30, 0, 0, 0, 0, time.UTC)
+			return base.AddDate(0, 0, v), nil
+		}
+	}
+
+	// Срезаем время/зоны/лишние пометки: " 00:00:00", "T00:00:00Z", " г.", "г."
+	s = stripDecor(s)
+
+	// Пробуем набор layout'ов (принимаем и 1-значные день/месяц)
+	layouts := []string{
+		"02.01.2006", "2.1.2006", "02.01.06", "2.1.06",
+		"2006-01-02", "2006-1-2",
+		"02-01-2006", "2-1-2006", "02-01-06", "2-1-06",
+		// частые варианты с временем
+		"02.01.2006 15:04", "2.1.2006 15:04", "02.01.2006 15:04:05", "2.1.2006 15:04:05",
+		"2006-01-02 15:04", "2006-1-2 15:04", "2006-01-02 15:04:05", "2006-1-2 15:04:05",
+		"02-01-2006 15:04", "2-1-2006 15:04", "02-01-2006 15:04:05", "2-1-2006 15:04:05",
+	}
+
+	// Заменяем "/" на "." — часто из локалей
+	sNorm := strings.ReplaceAll(s, "/", ".")
+
+	for _, l := range layouts {
+		if t, err := time.ParseInLocation(l, sNorm, time.UTC); err == nil {
+			// обнулим время
+			return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC), nil
+		}
+	}
+
+	// Последний шанс — чистый ISO
+	if t, err := time.ParseInLocation("2006-01-02", s, time.UTC); err == nil {
+		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC), nil
+	}
+
+	return time.Time{}, errors.New("unsupported date format")
+}
+
+func stripDecor(s string) string {
+	s = strings.TrimSpace(s)
+	// отрезаем по первому пробелу/букве T, если дальше идёт время/зона
+	if idx := strings.IndexAny(s, "T "); idx != -1 {
+		// только если после идёт что-то похожее на время
+		tail := s[idx+1:]
+		if strings.ContainsAny(tail, ":Z+-") {
+			s = s[:idx]
+		}
+	}
+	// выкидываем «г.»/«г» в конце
+	s = strings.TrimSpace(strings.TrimSuffix(strings.TrimSuffix(s, " г."), " г"))
+	s = strings.TrimSpace(strings.TrimSuffix(s, "г."))
+	s = strings.TrimSpace(strings.TrimSuffix(s, "г"))
+	return s
+}
+
+func isAllDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
