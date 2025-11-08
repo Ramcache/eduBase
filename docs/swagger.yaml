@@ -65,6 +65,37 @@ definitions:
       student_count:
         type: integer
     type: object
+  models.Staff:
+    properties:
+      category:
+        type: string
+      created_at:
+        type: string
+      education:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: integer
+      note:
+        type: string
+      ped_experience:
+        type: integer
+      phone:
+        type: string
+      position:
+        type: string
+      school_id:
+        type: integer
+      total_experience:
+        type: integer
+      work_start:
+        type: string
+    required:
+    - full_name
+    - phone
+    - position
+    type: object
 info:
   contact: {}
   description: База школ с ролями ROO и School.
@@ -429,6 +460,199 @@ paths:
       summary: Обновить школу
       tags:
       - Schools
+  /staff:
+    get:
+      description: ROO — все, School — только свои. Поддерживает фильтры по всем полям.
+      parameters:
+      - description: ФИО
+        in: query
+        name: full_name
+        type: string
+      - description: Телефон
+        in: query
+        name: phone
+        type: string
+      - description: Должность
+        in: query
+        name: position
+        type: string
+      - description: Образование
+        in: query
+        name: education
+        type: string
+      - description: Категория
+        in: query
+        name: category
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Staff'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить список сотрудников
+      tags:
+      - Staff
+    post:
+      consumes:
+      - application/json
+      description: Только школа может добавлять своих сотрудников
+      parameters:
+      - description: Данные сотрудника
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/models.Staff'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Staff'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Добавить сотрудника
+      tags:
+      - Staff
+  /staff/{id}:
+    delete:
+      description: School — только своего, ROO — любого
+      parameters:
+      - description: ID сотрудника
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Удалить сотрудника
+      tags:
+      - Staff
+    get:
+      description: ROO — любого, School — только своего
+      parameters:
+      - description: ID сотрудника
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Staff'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить сотрудника по ID
+      tags:
+      - Staff
+    put:
+      consumes:
+      - application/json
+      description: ROO — любого, School — только своего
+      parameters:
+      - description: ID сотрудника
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Обновлённые данные
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/models.Staff'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Обновить данные сотрудника
+      tags:
+      - Staff
+  /staff/stats:
+    get:
+      description: Кол-во сотрудников по должностям
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить статистику по персоналу (ROO)
+      tags:
+      - Staff
 securityDefinitions:
   BearerAuth:
     in: header
