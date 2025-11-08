@@ -53,6 +53,7 @@ func main() {
 	r.Use(middleware.JWTVerifier(jwtAuth))
 
 	r.Get("/swagger/*", httpSwagger.WrapHandler)
+	r.Get("/health", handlers.HealthHandler)
 
 	r.Group(func(r chi.Router) { // public
 		authHandler.Routes(r)
