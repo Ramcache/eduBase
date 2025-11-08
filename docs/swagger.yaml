@@ -1,0 +1,251 @@
+basePath: /
+definitions:
+  handlers.LoginResponse:
+    description: JWT токен для дальнейших запросов
+    properties:
+      token:
+        description: JWT-токен
+        example: eyJhbGciOiJIUzI1NiIs...
+        type: string
+    type: object
+  handlers.loginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.registerSchoolRequest:
+    properties:
+      director:
+        example: Иванов Иван
+        type: string
+      email:
+        example: school1@example.com
+        type: string
+      name:
+        example: Школа №1
+        type: string
+      password:
+        example: "123456"
+        type: string
+    type: object
+  helpers.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  models.School:
+    properties:
+      class_count:
+        type: integer
+      created_at:
+        type: string
+      director:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      student_count:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: База школ с ролями ROO и School.
+  title: eduBase API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Авторизация для ROO и School, возвращает JWT токен.
+      parameters:
+      - description: Данные для входа
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      summary: Авторизация пользователя
+      tags:
+      - Auth
+  /roo/register_school:
+    post:
+      consumes:
+      - application/json
+      description: Доступно только для ROO. Создаёт пользователя с ролью `school`
+        и запись в таблице `schools`.
+      parameters:
+      - description: Данные новой школы
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.registerSchoolRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: '{"status": "school registered"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Регистрация новой школы
+      tags:
+      - ROO
+  /roo/schools:
+    get:
+      description: Возвращает список всех школ (только для ROO)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.School'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить все школы
+      tags:
+      - Schools
+  /roo/schools/{id}:
+    delete:
+      description: Удаляет школу по ID (только для ROO)
+      parameters:
+      - description: ID школы
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Удалить школу
+      tags:
+      - Schools
+    get:
+      description: Возвращает данные конкретной школы (только для ROO)
+      parameters:
+      - description: ID школы
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.School'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить школу по ID
+      tags:
+      - Schools
+    put:
+      consumes:
+      - application/json
+      description: Обновляет данные школы по ID (только для ROO)
+      parameters:
+      - description: ID школы
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Поля для обновления
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.School'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Обновить школу
+      tags:
+      - Schools
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

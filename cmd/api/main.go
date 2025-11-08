@@ -15,8 +15,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/jackc/pgx/v5"
+
+	_ "eduBase/docs"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
+// @title eduBase API
+// @version 1.0
+// @description База школ с ролями ROO и School.
+// @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	cfg := config.Load()
 	logg := logger.New(cfg.AppEnv)
@@ -27,41 +37,35 @@ func main() {
 	}
 	defer conn.Close(context.Background())
 
-	// JWT
 	jwtAuth := jwtauth.New("HS256", []byte(cfg.JWTSecret), nil)
 
-	// === Repositories ===
 	userRepo := repository.NewUserRepository(conn)
 	schoolRepo := repository.NewSchoolRepository(conn)
 
-	// === Services ===
 	authSvc := services.NewAuthService(userRepo, jwtAuth)
 	schoolSvc := services.NewSchoolService(schoolRepo)
 
-	// === Handlers ===
 	authHandler := handlers.NewAuthHandler(authSvc)
-	rooHandler := handlers.NewRooHandler(authSvc)
+	rooHandler := handlers.NewRooHandler(authSvc, schoolRepo)
 	rooSchoolHandler := handlers.NewRooSchoolHandler(schoolSvc)
 
-	// === Router ===
 	r := chi.NewRouter()
-
-	// Проверка подписи токена для всех запросов
 	r.Use(middleware.JWTVerifier(jwtAuth))
 
-	// === Публичные маршруты ===
-	r.Group(func(r chi.Router) {
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
+
+	r.Group(func(r chi.Router) { // public
 		authHandler.Routes(r)
 	})
 
-	// === Только для ROO ===
-	r.Group(func(r chi.Router) {
+	r.Group(func(r chi.Router) { // ROO only
 		r.Use(middleware.Authenticator(jwtAuth))
 		r.Use(middleware.RequireRole("roo"))
 		rooHandler.Routes(r)
 		rooSchoolHandler.Routes(r)
 	})
 
+	logg.Infof("📘 Swagger: http://localhost:%s/docs/index.html", cfg.AppPort)
 	logg.Infof("✅ Server started on port %s", cfg.AppPort)
 	log.Fatal(http.ListenAndServe(":"+cfg.AppPort, r))
 }

@@ -40,12 +40,33 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 	return tokenStr, nil
 }
 
-func (s *AuthService) RegisterSchool(ctx context.Context, email, password string) error {
+func (s *AuthService) RegisterSchool(ctx context.Context, email, password, name, director string, schoolRepo *repository.SchoolRepository) error {
 	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+
+	// 1. создаём пользователя
 	u := &models.User{
 		Email:    email,
 		Password: string(hash),
 		Role:     "school",
 	}
-	return s.repo.Create(ctx, u)
+	if err := s.repo.Create(ctx, u); err != nil {
+		return err
+	}
+
+	// 2. ищем его id
+	user, err := s.repo.FindByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+
+	// 3. создаём школу
+	school := &models.School{
+		Name:     name,
+		Director: director,
+	}
+	if err := schoolRepo.Create(ctx, school, user.ID); err != nil {
+		return err
+	}
+
+	return nil
 }
