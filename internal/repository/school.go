@@ -77,3 +77,19 @@ func (r *SchoolRepository) Delete(ctx context.Context, id int) error {
 	_, err := r.db.Exec(ctx, `DELETE FROM schools WHERE id=$1`, id)
 	return err
 }
+
+func (r *SchoolRepository) GetByUserID(ctx context.Context, userID int) (*models.School, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT id, name, director, class_count, student_count, created_at
+		FROM schools WHERE user_id=$1
+	`, userID)
+
+	var s models.School
+	if err := row.Scan(&s.ID, &s.Name, &s.Director, &s.ClassCount, &s.StudentCount, &s.CreatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSchoolNotFound
+		}
+		return nil, err
+	}
+	return &s, nil
+}
