@@ -11,6 +11,7 @@ import (
 	"eduBase/internal/middleware"
 	"eduBase/internal/repository"
 	"eduBase/internal/services"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/jackc/pgx/v5"
@@ -26,29 +27,39 @@ func main() {
 	}
 	defer conn.Close(context.Background())
 
+	// JWT
 	jwtAuth := jwtauth.New("HS256", []byte(cfg.JWTSecret), nil)
 
+	// === Repositories ===
 	userRepo := repository.NewUserRepository(conn)
-	authSvc := services.NewAuthService(userRepo, jwtAuth)
+	schoolRepo := repository.NewSchoolRepository(conn)
 
+	// === Services ===
+	authSvc := services.NewAuthService(userRepo, jwtAuth)
+	schoolSvc := services.NewSchoolService(schoolRepo)
+
+	// === Handlers ===
 	authHandler := handlers.NewAuthHandler(authSvc)
 	rooHandler := handlers.NewRooHandler(authSvc)
+	rooSchoolHandler := handlers.NewRooSchoolHandler(schoolSvc)
 
+	// === Router ===
 	r := chi.NewRouter()
 
 	// Проверка подписи токена для всех запросов
 	r.Use(middleware.JWTVerifier(jwtAuth))
 
-	// Публичные маршруты
+	// === Публичные маршруты ===
 	r.Group(func(r chi.Router) {
 		authHandler.Routes(r)
 	})
 
-	// Только для ROO
+	// === Только для ROO ===
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Authenticator(jwtAuth))
 		r.Use(middleware.RequireRole("roo"))
 		rooHandler.Routes(r)
+		rooSchoolHandler.Routes(r)
 	})
 
 	logg.Infof("✅ Server started on port %s", cfg.AppPort)
