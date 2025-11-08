@@ -4,6 +4,7 @@ import (
 	"context"
 	"eduBase/internal/models"
 	"fmt"
+	"github.com/go-chi/cors"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"log"
@@ -61,6 +62,17 @@ func main() {
 	CreateDefaultAdmin(context.Background(), userRepo, logg)
 	// === Router ===
 	r := chi.NewRouter()
+
+	// CORS
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Authorization", "Content-Type"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
+
+	// JWT middleware
 	r.Use(middleware.JWTVerifier(jwtAuth))
 
 	// Public
