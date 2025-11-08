@@ -92,4 +92,19 @@ func (r *ClassRepository) Delete(ctx context.Context, id int, schoolID int) erro
 	return err
 }
 
+func (r *ClassRepository) GetByID(ctx context.Context, id int) (*models.Class, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT id, name, grade, school_id, student_count, created_at
+		FROM classes WHERE id=$1
+	`, id)
+	var c models.Class
+	if err := row.Scan(&c.ID, &c.Name, &c.Grade, &c.SchoolID, &c.StudentCount, &c.CreatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrClassNotFound
+		}
+		return nil, err
+	}
+	return &c, nil
+}
+
 func (r *ClassRepository) DB() *pgx.Conn { return r.db }

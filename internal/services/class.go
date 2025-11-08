@@ -44,3 +44,7 @@ func (s *ClassService) Update(ctx context.Context, id int, c *models.Class, role
 func (s *ClassService) Delete(ctx context.Context, id, schoolID int) error {
 	return s.repo.Delete(ctx, id, schoolID)
 }
+
+func (s *ClassService) GetByID(ctx context.Context, id int) (*models.Class, error) {
+	return s.repo.GetByID(ctx, id)
+}
