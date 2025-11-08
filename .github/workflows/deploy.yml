@@ -1,4 +1,4 @@
-name: 🚀 Deploy Go App
+name: 🚀 Deploy EduBase API
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
           mkdir -p build
           go build -o build/main ./cmd/api
 
-      - name: 📤 Upload files
+      - name: 📤 Upload files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -32,31 +32,33 @@ jobs:
           source: "build/main,migrations"
           target: /eduBase/
 
-      - name: 🧬 Run migrations & restart app
+      - name: 🧬 Run migrations & restart service
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
             cd /eduBase
 
             echo "⏫ Running Goose migrations..."
             /root/go/bin/goose -dir ./migrations postgres "${{ secrets.DB_URL }}" up
 
-            echo "🔁 Restarting app..."
-            pkill -f main || true
-            mkdir -p logs
-            nohup ./build/main > logs/app_$(date +%F).log 2>&1 &
+            echo "🔁 Restarting systemd service..."
+            sudo systemctl restart edubase
             sleep 5
+            sudo systemctl status edubase --no-pager
+
+            echo "🌐 Checking health endpoint..."
             curl -f http://localhost:8080/health || (echo "❌ App failed to start" && exit 1)
 
-      - name: 🐘 Restart Postgres
+      - name: 🐘 Ensure Postgres is running
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            sudo systemctl restart postgresql@16-main
-            sudo systemctl status postgresql@16-main --no-pager
+            sudo systemctl restart postgresql
+            sudo systemctl status postgresql --no-pager
