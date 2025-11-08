@@ -49,19 +49,21 @@ func main() {
 	schoolRepo := repository.NewSchoolRepository(conn)
 	classRepo := repository.NewClassRepository(conn)
 	staffRepo := repository.NewStaffRepository(conn)
+	studentRepo := repository.NewStudentRepository(conn)
 
 	// === Services ===
 	authSvc := services.NewAuthService(userRepo, jwtAuth)
 	schoolSvc := services.NewSchoolService(schoolRepo)
 	classSvc := services.NewClassService(classRepo)
 	staffSvc := services.NewStaffService(staffRepo)
-
+	studentSvc := services.NewStudentService(studentRepo, classRepo, schoolRepo)
 	// === Handlers ===
 	authHandler := handlers.NewAuthHandler(authSvc)
 	rooHandler := handlers.NewRooHandler(authSvc, schoolRepo)
 	rooSchoolHandler := handlers.NewRooSchoolHandler(schoolSvc)
 	classHandler := handlers.NewClassHandler(classSvc)
 	staffHandler := handlers.NewStaffHandler(staffSvc)
+	studentHandler := handlers.NewStudentHandler(studentSvc)
 
 	CreateDefaultAdmin(context.Background(), userRepo, logg)
 	// === Router ===
@@ -105,6 +107,12 @@ func main() {
 		r.Use(middleware.Authenticator(jwtAuth))
 		r.Use(middleware.RequireAnyRole("roo", "school"))
 		staffHandler.Routes(r)
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Authenticator(jwtAuth))
+		r.Use(middleware.RequireAnyRole("roo", "school"))
+		studentHandler.Routes(r)
 	})
 
 	logg.Infof("📘 Swagger: http://localhost:%s/docs/index.html", cfg.AppPort)

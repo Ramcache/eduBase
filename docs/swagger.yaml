@@ -96,6 +96,31 @@ definitions:
     - phone
     - position
     type: object
+  models.Student:
+    properties:
+      address:
+        type: string
+      birth_date:
+        type: string
+      class_id:
+        type: integer
+      created_at:
+        type: string
+      full_name:
+        type: string
+      gender:
+        type: string
+      id:
+        type: integer
+      note:
+        type: string
+      phone:
+        type: string
+      school_id:
+        type: integer
+    required:
+    - full_name
+    type: object
 info:
   contact: {}
   description: База школ с ролями ROO и School.
@@ -653,6 +678,200 @@ paths:
       summary: Получить статистику по персоналу (ROO)
       tags:
       - Staff
+  /students:
+    get:
+      parameters:
+      - description: ФИО
+        in: query
+        name: full_name
+        type: string
+      - description: Пол (male/female)
+        in: query
+        name: gender
+        type: string
+      - description: ID класса
+        in: query
+        name: class_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Student'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить список учеников
+      tags:
+      - Students
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные ученика
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/models.Student'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Student'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Добавить ученика
+      tags:
+      - Students
+  /students/{id}:
+    delete:
+      parameters:
+      - description: ID ученика
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Удалить ученика
+      tags:
+      - Students
+    get:
+      parameters:
+      - description: ID ученика
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Student'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить ученика по ID
+      tags:
+      - Students
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID ученика
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Новые данные
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/models.Student'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Обновить данные ученика
+      tags:
+      - Students
+  /students/export:
+    get:
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: csv file
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Экспорт учеников в CSV (только ROO)
+      tags:
+      - Students
+  /students/stats:
+    get:
+      description: Только для ROO (по полу, школам и т.д.)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить статистику по ученикам
+      tags:
+      - Students
 securityDefinitions:
   BearerAuth:
     in: header

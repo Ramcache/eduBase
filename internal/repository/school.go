@@ -93,3 +93,7 @@ func (r *SchoolRepository) GetByUserID(ctx context.Context, userID int) (*models
 	}
 	return &s, nil
 }
+
+func (r *SchoolRepository) DB() *pgx.Conn {
+	return r.db
+}
