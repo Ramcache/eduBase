@@ -1,19 +1,25 @@
 package logger
 
-import "go.uber.org/zap"
+import (
+	"os"
 
-var Log *zap.Logger
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+)
 
-func Init(env string) {
-	var l *zap.Logger
-	if env == "prod" {
-		l, _ = zap.NewProduction()
-	} else {
-		l, _ = zap.NewDevelopment()
+func New(env string) *zap.SugaredLogger {
+	level := zapcore.InfoLevel
+	if env != "prod" {
+		level = zapcore.DebugLevel
 	}
-	Log = l
-}
 
-func Err(err error) zap.Field       { return zap.Error(err) }
-func Str(k, v string) zap.Field     { return zap.String(k, v) }
-func Int(k string, v int) zap.Field { return zap.Int(k, v) }
+	cfg := zap.NewProductionEncoderConfig()
+	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(cfg),
+		zapcore.AddSync(os.Stdout),
+		level,
+	)
+	return zap.New(core).Sugar()
+}

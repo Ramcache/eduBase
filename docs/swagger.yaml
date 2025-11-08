@@ -1,382 +1,160 @@
 basePath: /
 definitions:
-  handlers.ConsentsUpsertRequest:
+  handlers.LoginResponse:
+    description: JWT токен для дальнейших запросов
     properties:
-      consent_data_processing:
-        type: boolean
-      consent_data_processing_date:
-        type: string
-      consent_internet_access:
-        type: boolean
-      consent_internet_access_date:
-        type: string
-      consent_photo_publication:
-        type: boolean
-      consent_photo_publication_date:
-        type: string
-      student_id:
-        type: integer
-    type: object
-  handlers.ContactAddRequest:
-    properties:
-      full_name:
-        type: string
-      phone:
-        type: string
-      relation:
-        type: string
-      student_id:
-        type: integer
-    type: object
-  handlers.CreateIDResponse:
-    properties:
-      id:
-        type: integer
-    type: object
-  handlers.CreateStudentCoreRequest:
-    properties:
-      admission_year:
-        type: integer
-      birth_date:
-        description: YYYY-MM-DD
-        type: string
-      citizenship:
-        type: string
-      class_label:
-        type: string
-      fact_address:
-        type: string
-      first_name:
-        type: string
-      gender:
-        type: string
-      last_name:
-        type: string
-      middle_name:
-        type: string
-      reg_address:
-        type: string
-      school_id:
-        type: integer
-      status:
-        type: string
-      student_email:
-        type: string
-      student_number:
-        type: string
-      student_phone:
+      token:
+        description: JWT-токен
+        example: eyJhbGciOiJIUzI1NiIs...
         type: string
     type: object
-  handlers.DocumentsUpsertRequest:
+  handlers.loginRequest:
     properties:
-      birth_certificate:
+      email:
         type: string
-      birth_date:
-        type: string
-      passport_number:
-        type: string
-      passport_series:
-        type: string
-      snils:
-        type: string
-      student_id:
-        type: integer
-    type: object
-  handlers.MedicalUpsertRequest:
-    properties:
-      activities:
-        type: string
-      allergies:
-        type: string
-      benefits:
-        type: string
-      health_group:
-        type: integer
-      medical_notes:
-        type: string
-      student_id:
-        type: integer
-    type: object
-  handlers.OkResponse:
-    properties:
-      status:
-        example: ok
+      password:
         type: string
     type: object
-  handlers.StudentListResponse:
+  handlers.registerSchoolRequest:
     properties:
-      items:
-        items:
-          $ref: '#/definitions/models.StudentListItem'
-        type: array
-      limit:
-        example: 50
-        type: integer
-      offset:
-        example: 0
-        type: integer
-      total:
-        example: 1
-        type: integer
-    type: object
-  handlers.UpdateStudentCoreRequest:
-    properties:
-      admission_year:
-        type: integer
-      birth_date:
-        description: YYYY-MM-DD
+      director:
+        example: Иванов Иван
         type: string
-      citizenship:
+      email:
+        example: school1@example.com
         type: string
-      class_label:
+      name:
+        example: Школа №1
         type: string
-      fact_address:
-        type: string
-      first_name:
-        type: string
-      gender:
-        type: string
-      last_name:
-        type: string
-      middle_name:
-        type: string
-      reg_address:
-        type: string
-      school_id:
-        type: integer
-      status:
-        type: string
-      student_email:
-        type: string
-      student_number:
-        type: string
-      student_phone:
+      password:
+        example: "123456"
         type: string
     type: object
-  models.Gender:
-    enum:
-    - m
-    - f
-    type: string
-    x-enum-varnames:
-    - GenderMale
-    - GenderFemale
-  models.StudentListItem:
+  helpers.ErrorResponse:
     properties:
-      admission_year:
+      error:
+        type: string
+    type: object
+  models.School:
+    properties:
+      class_count:
         type: integer
-      birth_date:
-        type: string
-      class_label:
-        type: string
       created_at:
         type: string
-      full_name:
+      director:
         type: string
-      gender:
-        $ref: '#/definitions/models.Gender'
       id:
         type: integer
-      school_id:
-        type: integer
-      status:
-        $ref: '#/definitions/models.StudentStatus'
-      student_number:
+      name:
         type: string
+      student_count:
+        type: integer
     type: object
-  models.StudentStatus:
-    enum:
-    - enrolled
-    - transferred
-    - graduated
-    - expelled
-    type: string
-    x-enum-varnames:
-    - StatusEnrolled
-    - StatusTransferred
-    - StatusGraduated
-    - StatusExpelled
-host: localhost:8080
 info:
-  contact:
-    email: admin@example.com
-    name: EduBase Team
-  description: Внутренний API школьной базы (ученики, документы, медицина, согласия,
-    контакты).
-  title: EduBase API
+  contact: {}
+  description: База школ с ролями ROO и School.
+  title: eduBase API
   version: "1.0"
 paths:
-  /api/students:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Авторизация для ROO и School, возвращает JWT токен.
+      parameters:
+      - description: Данные для входа
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      summary: Авторизация пользователя
+      tags:
+      - Auth
+  /roo/register_school:
+    post:
+      consumes:
+      - application/json
+      description: Доступно только для ROO. Создаёт пользователя с ролью `school`
+        и запись в таблице `schools`.
+      parameters:
+      - description: Данные новой школы
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.registerSchoolRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: '{"status": "school registered"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Регистрация новой школы
+      tags:
+      - ROO
+  /roo/schools:
     get:
-      description: Список учеников с фильтрами и пагинацией
-      parameters:
-      - description: Поиск по ФИО (ILIKE)
-        in: query
-        name: q
-        type: string
-      - description: ID школы
-        in: query
-        name: school_id
-        type: integer
-      - description: Класс (например 7А)
-        in: query
-        name: class
-        type: string
-      - description: enrolled|transferred|graduated|expelled
-        in: query
-        name: status
-        type: string
-      - description: Год поступления с
-        in: query
-        name: admission_year_from
-        type: integer
-      - description: Год поступления по
-        in: query
-        name: admission_year_to
-        type: integer
-      - description: Дата рождения c (YYYY-MM-DD)
-        in: query
-        name: birth_date_from
-        type: string
-      - description: Дата рождения по (YYYY-MM-DD)
-        in: query
-        name: birth_date_to
-        type: string
-      - default: 50
-        description: Лимит
-        in: query
-        name: limit
-        type: integer
-      - default: 0
-        description: Смещение
-        in: query
-        name: offset
-        type: integer
+      description: Возвращает список всех школ (только для ROO)
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.StudentListResponse'
-      summary: List students
+            items:
+              $ref: '#/definitions/models.School'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить все школы
       tags:
-      - Students
-    post:
-      consumes:
-      - application/json
-      description: Создать базовую карточку ученика (А+Б+В)
-      parameters:
-      - description: Core payload
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.CreateStudentCoreRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.CreateIDResponse'
-        "422":
-          description: validation error
-          schema:
-            type: string
-      summary: Create student core
-      tags:
-      - Students
-  /api/students/{id}:
-    patch:
-      consumes:
-      - application/json
-      description: Частичное/полное обновление базовой карточки (в текущей реализации
-        как PUT)
-      parameters:
-      - description: Student ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Core payload
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UpdateStudentCoreRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.OkResponse'
-        "422":
-          description: validation error
-          schema:
-            type: string
-      summary: Update student core (PATCH)
-      tags:
-      - Students
-  /api/students/{id}/contacts:
-    post:
-      consumes:
-      - application/json
-      description: Добавить экстренный контакт к ученику
-      parameters:
-      - description: Student ID (в URL)
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Contact payload (содержит student_id)
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.ContactAddRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.CreateIDResponse'
-      summary: Add emergency contact
-      tags:
-      - Contacts
-  /api/students/consents:
-    put:
-      consumes:
-      - application/json
-      description: Обновить/создать согласия (ПДн, фото, интернет)
-      parameters:
-      - description: Consents payload
-        in: body
-        name: payload
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.ConsentsUpsertRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.OkResponse'
-        "422":
-          description: validation error
-          schema:
-            type: string
-      summary: Upsert consents
-      tags:
-      - Consents
-  /api/students/contacts/{id}:
+      - Schools
+  /roo/schools/{id}:
     delete:
-      description: Удалить экстренный контакт по ID
+      description: Удаляет школу по ID (только для ROO)
       parameters:
-      - description: Contact ID
+      - description: ID школы
         in: path
         name: id
         required: true
@@ -387,59 +165,87 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.OkResponse'
-      summary: Delete emergency contact
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Удалить школу
       tags:
-      - Contacts
-  /api/students/docs:
-    put:
-      consumes:
-      - application/json
-      description: Обновить/создать документы ученика (СНИЛС обязателен; паспорт обязателен
-        с 14 лет и 1 месяц, иначе — свидетельство)
+      - Schools
+    get:
+      description: Возвращает данные конкретной школы (только для ROO)
       parameters:
-      - description: Documents payload
-        in: body
-        name: payload
+      - description: ID школы
+        in: path
+        name: id
         required: true
-        schema:
-          $ref: '#/definitions/handlers.DocumentsUpsertRequest'
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.OkResponse'
-        "422":
-          description: validation error
+            $ref: '#/definitions/models.School'
+        "404":
+          description: Not Found
           schema:
-            type: string
-      summary: Upsert documents
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить школу по ID
       tags:
-      - Documents
-  /api/students/medical:
+      - Schools
     put:
       consumes:
       - application/json
-      description: Обновить/создать мед.данные/льготы/кружки
+      description: Обновляет данные школы по ID (только для ROO)
       parameters:
-      - description: Medical payload
+      - description: ID школы
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Поля для обновления
         in: body
-        name: payload
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.MedicalUpsertRequest'
+          $ref: '#/definitions/models.School'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.OkResponse'
-      summary: Upsert medical
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Обновить школу
       tags:
-      - Medical
-schemes:
-- http
+      - Schools
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

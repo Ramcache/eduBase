@@ -1,0 +1,105 @@
+version: '3'
+
+vars:
+  BIN: bin/eduBase
+
+
+tasks:
+  migrate:create:
+    cmds:
+      - goose -dir ./migrations create {{.name}} sql
+    desc: "Создать новую миграцию goose (sql)"
+
+  migrate:up:
+    cmds:
+      - goose -dir ./migrations postgres postgres://postgres:625325@localhost:5432/school_db?sslmode=disable up
+    desc: "Применить миграции"
+
+  migrate:down:
+    cmds:
+      - goose -dir ./migrations postgres postgres://postgres:625325@localhost:5432/school_db?sslmode=disable down
+    desc: "Откатить последнюю миграцию"
+
+
+  swagger:install:
+    desc: Install swag CLI
+    cmds:
+      - go install github.com/swaggo/swag/cmd/swag@latest
+
+  swagger:gen:
+    desc: Generate Swagger docs
+    deps: [swagger:install]
+    cmds:
+      - swag init -g cmd/api/main.go -o docs
+
+  # ==== CI/CD Tasks ====
+  lint:
+    desc: Run go vet and staticcheck
+    cmds:
+      - go vet ./...
+      - |
+        if command -v staticcheck > /dev/null; then
+          staticcheck ./...
+        else
+          echo "⚠️ staticcheck not installed, skipping"
+        fi
+
+  test:
+    desc: Run all tests locally with race detector
+    cmds:
+      - CGO_ENABLED=1 go test ./... -v -race -cover
+
+  test:ci:
+    desc: Run all tests in CI (faster, no race)
+    cmds:
+      - go test ./... -v -cover
+
+  build:
+    desc: Build binary for Linux amd64 (prod)
+    cmds:
+      - GOOS=linux GOARCH=amd64 go build -o {{.BIN}} ./cmd/api
+
+  ci:
+    desc: Run full CI pipeline (lint, test:ci, swagger, build)
+    deps: [lint, test:ci, swagger:gen, build]
+
+  git:status:
+    desc: "Показать статус git"
+    cmds:
+      - git status
+
+  git:add:
+    desc: "Добавить все изменения в staging"
+    cmds:
+      - git add .
+
+  git:commit:
+    desc: "Сделать коммит (передавать сообщение через msg)"
+    cmds:
+      - git commit -m "{{.msg}}"
+    vars:
+      MESSAGE: "update"
+
+  git:push:
+    desc: "Запушить в origin main"
+    cmds:
+      - git push origin dev
+
+  git:pull:
+    desc: "Обновить локальную ветку"
+    cmds:
+      - git pull origin dev
+
+  git:acp:
+    desc: "Коммит и пуш с сообщением (по умолчанию: update)"
+    cmds:
+      - git add .
+      - |
+        if ! git diff --cached --quiet; then
+          echo "🟢 Коммитим: {{.msg | default "update"}}"
+          git commit -m "{{.msg | default "update"}}"
+        else
+          echo "✅ Нет изменений для коммита"
+        fi
+      - echo "🚀 Пушим в ветку dev..."
+      - git push origin dev

@@ -9,140 +9,210 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "contact": {
-            "name": "EduBase Team",
-            "email": "admin@example.com"
-        },
+        "contact": {},
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/students": {
-            "get": {
-                "description": "Список учеников с фильтрами и пагинацией",
+        "/auth/login": {
+            "post": {
+                "description": "Авторизация для ROO и School, возвращает JWT токен.",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Students"
+                    "Auth"
                 ],
-                "summary": "List students",
+                "summary": "Авторизация пользователя",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Поиск по ФИО (ILIKE)",
-                        "name": "q",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "ID школы",
-                        "name": "school_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Класс (например 7А)",
-                        "name": "class",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "enrolled|transferred|graduated|expelled",
-                        "name": "status",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Год поступления с",
-                        "name": "admission_year_from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Год поступления по",
-                        "name": "admission_year_to",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Дата рождения c (YYYY-MM-DD)",
-                        "name": "birth_date_from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Дата рождения по (YYYY-MM-DD)",
-                        "name": "birth_date_to",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 50,
-                        "description": "Лимит",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "default": 0,
-                        "description": "Смещение",
-                        "name": "offset",
-                        "in": "query"
+                        "description": "Данные для входа",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.loginRequest"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.StudentListResponse"
+                            "$ref": "#/definitions/handlers.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/roo/register_school": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Доступно только для ROO. Создаёт пользователя с ролью ` + "`" + `school` + "`" + ` и запись в таблице ` + "`" + `schools` + "`" + `.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ROO"
+                ],
+                "summary": "Регистрация новой школы",
+                "parameters": [
+                    {
+                        "description": "Данные новой школы",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.registerSchoolRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "{\"status\": \"school registered\"}",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/roo/schools": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает список всех школ (только для ROO)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Schools"
+                ],
+                "summary": "Получить все школы",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.School"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/roo/schools/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает данные конкретной школы (только для ROO)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Schools"
+                ],
+                "summary": "Получить школу по ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID школы",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.School"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
             },
-            "post": {
-                "description": "Создать базовую карточку ученика (А+Б+В)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Students"
-                ],
-                "summary": "Create student core",
-                "parameters": [
-                    {
-                        "description": "Core payload",
-                        "name": "payload",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateStudentCoreRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateIDResponse"
-                        }
-                    },
-                    "422": {
-                        "description": "validation error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/students/consents": {
             "put": {
-                "description": "Обновить/создать согласия (ПДн, фото, интернет)",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Обновляет данные школы по ID (только для ROO)",
                 "consumes": [
                     "application/json"
                 ],
@@ -150,17 +220,24 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Consents"
+                    "Schools"
                 ],
-                "summary": "Upsert consents",
+                "summary": "Обновить школу",
                 "parameters": [
                     {
-                        "description": "Consents payload",
-                        "name": "payload",
+                        "type": "integer",
+                        "description": "ID школы",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Поля для обновления",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.ConsentsUpsertRequest"
+                            "$ref": "#/definitions/models.School"
                         }
                     }
                 ],
@@ -168,32 +245,44 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.OkResponse"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
-                    "422": {
-                        "description": "validation error",
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
-                            "type": "string"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
-            }
-        },
-        "/api/students/contacts/{id}": {
+            },
             "delete": {
-                "description": "Удалить экстренный контакт по ID",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Удаляет школу по ID (только для ROO)",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Contacts"
+                    "Schools"
                 ],
-                "summary": "Delete emergency contact",
+                "summary": "Удалить школу",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Contact ID",
+                        "description": "ID школы",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -203,169 +292,16 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.OkResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/students/docs": {
-            "put": {
-                "description": "Обновить/создать документы ученика (СНИЛС обязателен; паспорт обязателен с 14 лет и 1 месяц, иначе — свидетельство)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Documents"
-                ],
-                "summary": "Upsert documents",
-                "parameters": [
-                    {
-                        "description": "Documents payload",
-                        "name": "payload",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.DocumentsUpsertRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.OkResponse"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     },
-                    "422": {
-                        "description": "validation error",
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/students/medical": {
-            "put": {
-                "description": "Обновить/создать мед.данные/льготы/кружки",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Medical"
-                ],
-                "summary": "Upsert medical",
-                "parameters": [
-                    {
-                        "description": "Medical payload",
-                        "name": "payload",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.MedicalUpsertRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.OkResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/students/{id}": {
-            "patch": {
-                "description": "Частичное/полное обновление базовой карточки (в текущей реализации как PUT)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Students"
-                ],
-                "summary": "Update student core (PATCH)",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Student ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Core payload",
-                        "name": "payload",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UpdateStudentCoreRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.OkResponse"
-                        }
-                    },
-                    "422": {
-                        "description": "validation error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/students/{id}/contacts": {
-            "post": {
-                "description": "Добавить экстренный контакт к ученику",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Contacts"
-                ],
-                "summary": "Add emergency contact",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Student ID (в URL)",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Contact payload (содержит student_id)",
-                        "name": "payload",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ContactAddRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateIDResponse"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
@@ -373,297 +309,86 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "handlers.ConsentsUpsertRequest": {
+        "handlers.LoginResponse": {
+            "description": "JWT токен для дальнейших запросов",
             "type": "object",
             "properties": {
-                "consent_data_processing": {
-                    "type": "boolean"
-                },
-                "consent_data_processing_date": {
-                    "type": "string"
-                },
-                "consent_internet_access": {
-                    "type": "boolean"
-                },
-                "consent_internet_access_date": {
-                    "type": "string"
-                },
-                "consent_photo_publication": {
-                    "type": "boolean"
-                },
-                "consent_photo_publication_date": {
-                    "type": "string"
-                },
-                "student_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.ContactAddRequest": {
-            "type": "object",
-            "properties": {
-                "full_name": {
-                    "type": "string"
-                },
-                "phone": {
-                    "type": "string"
-                },
-                "relation": {
-                    "type": "string"
-                },
-                "student_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.CreateIDResponse": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.CreateStudentCoreRequest": {
-            "type": "object",
-            "properties": {
-                "admission_year": {
-                    "type": "integer"
-                },
-                "birth_date": {
-                    "description": "YYYY-MM-DD",
-                    "type": "string"
-                },
-                "citizenship": {
-                    "type": "string"
-                },
-                "class_label": {
-                    "type": "string"
-                },
-                "fact_address": {
-                    "type": "string"
-                },
-                "first_name": {
-                    "type": "string"
-                },
-                "gender": {
-                    "type": "string"
-                },
-                "last_name": {
-                    "type": "string"
-                },
-                "middle_name": {
-                    "type": "string"
-                },
-                "reg_address": {
-                    "type": "string"
-                },
-                "school_id": {
-                    "type": "integer"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "student_email": {
-                    "type": "string"
-                },
-                "student_number": {
-                    "type": "string"
-                },
-                "student_phone": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.DocumentsUpsertRequest": {
-            "type": "object",
-            "properties": {
-                "birth_certificate": {
-                    "type": "string"
-                },
-                "birth_date": {
-                    "type": "string"
-                },
-                "passport_number": {
-                    "type": "string"
-                },
-                "passport_series": {
-                    "type": "string"
-                },
-                "snils": {
-                    "type": "string"
-                },
-                "student_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.MedicalUpsertRequest": {
-            "type": "object",
-            "properties": {
-                "activities": {
-                    "type": "string"
-                },
-                "allergies": {
-                    "type": "string"
-                },
-                "benefits": {
-                    "type": "string"
-                },
-                "health_group": {
-                    "type": "integer"
-                },
-                "medical_notes": {
-                    "type": "string"
-                },
-                "student_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "handlers.OkResponse": {
-            "type": "object",
-            "properties": {
-                "status": {
+                "token": {
+                    "description": "JWT-токен",
                     "type": "string",
-                    "example": "ok"
+                    "example": "eyJhbGciOiJIUzI1NiIs..."
                 }
             }
         },
-        "handlers.StudentListResponse": {
+        "handlers.loginRequest": {
             "type": "object",
             "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.StudentListItem"
-                    }
-                },
-                "limit": {
-                    "type": "integer",
-                    "example": 50
-                },
-                "offset": {
-                    "type": "integer",
-                    "example": 0
-                },
-                "total": {
-                    "type": "integer",
-                    "example": 1
-                }
-            }
-        },
-        "handlers.UpdateStudentCoreRequest": {
-            "type": "object",
-            "properties": {
-                "admission_year": {
-                    "type": "integer"
-                },
-                "birth_date": {
-                    "description": "YYYY-MM-DD",
+                "email": {
                     "type": "string"
                 },
-                "citizenship": {
-                    "type": "string"
-                },
-                "class_label": {
-                    "type": "string"
-                },
-                "fact_address": {
-                    "type": "string"
-                },
-                "first_name": {
-                    "type": "string"
-                },
-                "gender": {
-                    "type": "string"
-                },
-                "last_name": {
-                    "type": "string"
-                },
-                "middle_name": {
-                    "type": "string"
-                },
-                "reg_address": {
-                    "type": "string"
-                },
-                "school_id": {
-                    "type": "integer"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "student_email": {
-                    "type": "string"
-                },
-                "student_number": {
-                    "type": "string"
-                },
-                "student_phone": {
+                "password": {
                     "type": "string"
                 }
             }
         },
-        "models.Gender": {
-            "type": "string",
-            "enum": [
-                "m",
-                "f"
-            ],
-            "x-enum-varnames": [
-                "GenderMale",
-                "GenderFemale"
-            ]
-        },
-        "models.StudentListItem": {
+        "handlers.registerSchoolRequest": {
             "type": "object",
             "properties": {
-                "admission_year": {
+                "director": {
+                    "type": "string",
+                    "example": "Иванов Иван"
+                },
+                "email": {
+                    "type": "string",
+                    "example": "school1@example.com"
+                },
+                "name": {
+                    "type": "string",
+                    "example": "Школа №1"
+                },
+                "password": {
+                    "type": "string",
+                    "example": "123456"
+                }
+            }
+        },
+        "helpers.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.School": {
+            "type": "object",
+            "properties": {
+                "class_count": {
                     "type": "integer"
-                },
-                "birth_date": {
-                    "type": "string"
-                },
-                "class_label": {
-                    "type": "string"
                 },
                 "created_at": {
                     "type": "string"
                 },
-                "full_name": {
+                "director": {
                     "type": "string"
-                },
-                "gender": {
-                    "$ref": "#/definitions/models.Gender"
                 },
                 "id": {
                     "type": "integer"
                 },
-                "school_id": {
-                    "type": "integer"
-                },
-                "status": {
-                    "$ref": "#/definitions/models.StudentStatus"
-                },
-                "student_number": {
+                "name": {
                     "type": "string"
+                },
+                "student_count": {
+                    "type": "integer"
                 }
             }
-        },
-        "models.StudentStatus": {
-            "type": "string",
-            "enum": [
-                "enrolled",
-                "transferred",
-                "graduated",
-                "expelled"
-            ],
-            "x-enum-varnames": [
-                "StatusEnrolled",
-                "StatusTransferred",
-                "StatusGraduated",
-                "StatusExpelled"
-            ]
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`
@@ -671,11 +396,11 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:8080",
+	Host:             "",
 	BasePath:         "/",
-	Schemes:          []string{"http"},
-	Title:            "EduBase API",
-	Description:      "Внутренний API школьной базы (ученики, документы, медицина, согласия, контакты).",
+	Schemes:          []string{},
+	Title:            "eduBase API",
+	Description:      "База школ с ролями ROO и School.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

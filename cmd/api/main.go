@@ -2,65 +2,70 @@ package main
 
 import (
 	"context"
-	_ "eduBase/docs"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
-	"eduBase/internal/config"
+	"eduBase/config"
+	"eduBase/internal/handlers"
 	"eduBase/internal/logger"
-	"eduBase/internal/server"
+	"eduBase/internal/middleware"
+	"eduBase/internal/repository"
+	"eduBase/internal/services"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/jwtauth/v5"
+	"github.com/jackc/pgx/v5"
+
+	_ "eduBase/docs"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
-// @title           EduBase API
-// @version         1.0
-// @description     Внутренний API школьной базы (ученики, документы, медицина, согласия, контакты).
-// @contact.name    EduBase Team
-// @contact.email   admin@example.com
-// @BasePath        /
-// @schemes         http
-// @host            localhost:8080
+// @title eduBase API
+// @version 1.0
+// @description База школ с ролями ROO и School.
+// @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
-	cfg, err := config.Load()
+	cfg := config.Load()
+	logg := logger.New(cfg.AppEnv)
+
+	conn, err := pgx.Connect(context.Background(), cfg.DBURL)
 	if err != nil {
-		log.Fatalf("config load: %v", err)
+		log.Fatal("db connect failed:", err)
 	}
-	logger.Init(cfg.AppEnv)
-	defer logger.Log.Sync()
+	defer conn.Close(context.Background())
 
-	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
-	if err != nil {
-		logger.Log.Fatal("db pool", logger.Err(err))
-	}
-	defer pool.Close()
+	jwtAuth := jwtauth.New("HS256", []byte(cfg.JWTSecret), nil)
 
-	r := server.NewRouter(cfg, pool)
+	userRepo := repository.NewUserRepository(conn)
+	schoolRepo := repository.NewSchoolRepository(conn)
 
-	srv := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           r,
-		ReadTimeout:       20 * time.Second,
-		WriteTimeout:      20 * time.Second,
-		ReadHeaderTimeout: 10 * time.Second,
-	}
+	authSvc := services.NewAuthService(userRepo, jwtAuth)
+	schoolSvc := services.NewSchoolService(schoolRepo)
 
-	go func() {
-		logger.Log.Info("HTTP listening", logger.Str("addr", cfg.HTTPAddr))
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Log.Fatal("server", logger.Err(err))
-		}
-	}()
+	authHandler := handlers.NewAuthHandler(authSvc)
+	rooHandler := handlers.NewRooHandler(authSvc, schoolRepo)
+	rooSchoolHandler := handlers.NewRooSchoolHandler(schoolSvc)
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	r := chi.NewRouter()
+	r.Use(middleware.JWTVerifier(jwtAuth))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	_ = srv.Shutdown(ctx)
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
+
+	r.Group(func(r chi.Router) { // public
+		authHandler.Routes(r)
+	})
+
+	r.Group(func(r chi.Router) { // ROO only
+		r.Use(middleware.Authenticator(jwtAuth))
+		r.Use(middleware.RequireRole("roo"))
+		rooHandler.Routes(r)
+		rooSchoolHandler.Routes(r)
+	})
+
+	logg.Infof("📘 Swagger: http://localhost:%s/docs/index.html", cfg.AppPort)
+	logg.Infof("✅ Server started on port %s", cfg.AppPort)
+	log.Fatal(http.ListenAndServe(":"+cfg.AppPort, r))
 }
