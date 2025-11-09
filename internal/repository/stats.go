@@ -24,27 +24,29 @@ func (r *StatsRepository) GetSummary(ctx context.Context, schoolID *int) (*model
 	if schoolID == nil {
 		q = `
 		WITH
+		sch AS (SELECT COUNT(*)::int AS n FROM schools),
 		c AS (SELECT COUNT(*)::int AS n FROM classes),
-		s AS (SELECT COUNT(*)::int AS n FROM students),
+		stu AS (SELECT COUNT(*)::int AS n FROM students),
 		t AS (SELECT COUNT(*)::int AS n FROM staff WHERE position ILIKE '%учител%'),
 		st AS (SELECT COUNT(*)::int AS n FROM staff)
-		SELECT c.n, s.n, t.n, st.n FROM c,s,t,st;
+		SELECT sch.n, c.n, stu.n, t.n, st.n FROM sch,c,stu,t,st;
 		`
 	} else {
 		q = `
 		WITH
+		sch AS (SELECT COUNT(*)::int AS n FROM schools WHERE id = $1),
 		c AS (SELECT COUNT(*)::int AS n FROM classes  WHERE school_id = $1),
-		s AS (SELECT COUNT(*)::int AS n FROM students WHERE school_id = $1),
+		stu AS (SELECT COUNT(*)::int AS n FROM students WHERE school_id = $1),
 		t AS (SELECT COUNT(*)::int AS n FROM staff    WHERE school_id = $1 AND position ILIKE '%учител%'),
 		st AS (SELECT COUNT(*)::int AS n FROM staff    WHERE school_id = $1)
-		SELECT c.n, s.n, t.n, st.n FROM c,s,t,st;
+		SELECT sch.n, c.n, stu.n, t.n, st.n FROM sch,c,stu,t,st;
 		`
 		args = append(args, *schoolID)
 	}
 
 	row := r.db.QueryRow(ctx, q, args...)
 	var res models.StatsSummary
-	if err := row.Scan(&res.Classes, &res.Students, &res.Teachers, &res.StaffTotal); err != nil {
+	if err := row.Scan(&res.Schools, &res.Classes, &res.Students, &res.Teachers, &res.StaffTotal); err != nil {
 		return nil, err
 	}
 	return &res, nil

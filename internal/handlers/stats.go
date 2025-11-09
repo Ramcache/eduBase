@@ -35,7 +35,7 @@ func (h *StatsHandler) Routes(r chi.Router) {
 // @Produce json
 // @Param school_id query int false "Фильтрация по школе (только для ROO)"
 // @Security BearerAuth
-// @Success 200 {object} models.StatsSummary
+// @Success 200 {object} models.StatsSummary "schools, classes, students, teachers, staff_total"
 // @Failure 400 {object} helpers.ErrorResponse
 // @Failure 403 {object} helpers.ErrorResponse
 // @Failure 500 {object} helpers.ErrorResponse
