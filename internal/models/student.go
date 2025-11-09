@@ -11,6 +11,7 @@ type Student struct {
 	Address   *string    `json:"address,omitempty"`
 	Note      *string    `json:"note,omitempty"`
 	ClassID   int        `json:"class_id"`
+	ClassName string     `json:"class"`
 	SchoolID  int        `json:"school_id"`
 	CreatedAt time.Time  `json:"created_at"`
 }

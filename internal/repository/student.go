@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/jackc/pgx/v5/pgconn"
 	"strings"
 
 	"eduBase/internal/models"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type StudentFilter struct {
@@ -27,6 +27,7 @@ func NewStudentRepository(db *pgx.Conn) *StudentRepository {
 
 var ErrStudentNotFound = errors.New("student not found")
 
+// ===== CREATE =====
 func (r *StudentRepository) Create(ctx context.Context, s *models.Student) error {
 	query := `
 		INSERT INTO students (full_name, birth_date, gender, phone, address, note, class_id, school_id)
@@ -38,31 +39,34 @@ func (r *StudentRepository) Create(ctx context.Context, s *models.Student) error
 	).Scan(&s.ID, &s.CreatedAt)
 }
 
+// ===== GET ALL (with class name) =====
 func (r *StudentRepository) GetAll(ctx context.Context, schoolID *int, f StudentFilter) ([]models.Student, error) {
 	base := `
-	SELECT id, full_name, birth_date, gender, phone, address, note, class_id, school_id, created_at
-	FROM students`
+	SELECT s.id, s.full_name, s.birth_date, s.gender, s.phone, s.address, s.note,
+	       s.class_id, c.name AS class_name, s.school_id, s.created_at
+	FROM students s
+	JOIN classes c ON c.id = s.class_id`
 	var where []string
 	var args []any
 	i := 1
 
 	if schoolID != nil {
-		where = append(where, fmt.Sprintf("school_id=$%d", i))
+		where = append(where, fmt.Sprintf("s.school_id=$%d", i))
 		args = append(args, *schoolID)
 		i++
 	}
 	if f.FullName != "" {
-		where = append(where, fmt.Sprintf("LOWER(full_name) ILIKE $%d", i))
+		where = append(where, fmt.Sprintf("LOWER(s.full_name) ILIKE $%d", i))
 		args = append(args, "%"+strings.ToLower(f.FullName)+"%")
 		i++
 	}
 	if f.Gender != "" {
-		where = append(where, fmt.Sprintf("gender=$%d", i))
+		where = append(where, fmt.Sprintf("s.gender=$%d", i))
 		args = append(args, f.Gender)
 		i++
 	}
 	if f.ClassID != nil {
-		where = append(where, fmt.Sprintf("class_id=$%d", i))
+		where = append(where, fmt.Sprintf("s.class_id=$%d", i))
 		args = append(args, *f.ClassID)
 		i++
 	}
@@ -71,7 +75,7 @@ func (r *StudentRepository) GetAll(ctx context.Context, schoolID *int, f Student
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
-	query += " ORDER BY full_name"
+	query += " ORDER BY s.full_name"
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -82,7 +86,11 @@ func (r *StudentRepository) GetAll(ctx context.Context, schoolID *int, f Student
 	var list []models.Student
 	for rows.Next() {
 		var s models.Student
-		if err := rows.Scan(&s.ID, &s.FullName, &s.BirthDate, &s.Gender, &s.Phone, &s.Address, &s.Note, &s.ClassID, &s.SchoolID, &s.CreatedAt); err != nil {
+		if err := rows.Scan(
+			&s.ID, &s.FullName, &s.BirthDate, &s.Gender,
+			&s.Phone, &s.Address, &s.Note,
+			&s.ClassID, &s.ClassName, &s.SchoolID, &s.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		list = append(list, s)
@@ -90,26 +98,20 @@ func (r *StudentRepository) GetAll(ctx context.Context, schoolID *int, f Student
 	return list, nil
 }
 
-func (r *StudentRepository) Delete(ctx context.Context, id int, schoolID int) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM students WHERE id=$1 AND school_id=$2`, id, schoolID)
-	return err
-}
-
-func (r *StudentRepository) CountByClass(ctx context.Context, classID int) (int, error) {
-	var count int
-	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM students WHERE class_id=$1`, classID).Scan(&count)
-	return count, err
-}
-
+// ===== GET BY ID (with class name) =====
 func (r *StudentRepository) GetByID(ctx context.Context, id int) (*models.Student, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, full_name, birth_date, gender, phone, address, note, class_id, school_id, created_at
-		FROM students WHERE id=$1`, id)
+		SELECT s.id, s.full_name, s.birth_date, s.gender, s.phone, s.address, s.note,
+		       s.class_id, c.name AS class_name, s.school_id, s.created_at
+		FROM students s
+		JOIN classes c ON c.id = s.class_id
+		WHERE s.id=$1`, id)
 
 	var s models.Student
 	if err := row.Scan(
-		&s.ID, &s.FullName, &s.BirthDate, &s.Gender, &s.Phone,
-		&s.Address, &s.Note, &s.ClassID, &s.SchoolID, &s.CreatedAt,
+		&s.ID, &s.FullName, &s.BirthDate, &s.Gender,
+		&s.Phone, &s.Address, &s.Note,
+		&s.ClassID, &s.ClassName, &s.SchoolID, &s.CreatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrStudentNotFound
@@ -119,6 +121,7 @@ func (r *StudentRepository) GetByID(ctx context.Context, id int) (*models.Studen
 	return &s, nil
 }
 
+// ===== UPDATE =====
 func (r *StudentRepository) Update(ctx context.Context, id int, s *models.Student, role string) (int64, error) {
 	var res pgconn.CommandTag
 	var err error
@@ -141,6 +144,20 @@ func (r *StudentRepository) Update(ctx context.Context, id int, s *models.Studen
 	return res.RowsAffected(), nil
 }
 
+// ===== DELETE =====
+func (r *StudentRepository) Delete(ctx context.Context, id int, schoolID int) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM students WHERE id=$1 AND school_id=$2`, id, schoolID)
+	return err
+}
+
+// ===== COUNT BY CLASS =====
+func (r *StudentRepository) CountByClass(ctx context.Context, classID int) (int, error) {
+	var count int
+	err := r.db.QueryRow(ctx, `SELECT COUNT(*) FROM students WHERE class_id=$1`, classID).Scan(&count)
+	return count, err
+}
+
+// ===== STATS =====
 func (r *StudentRepository) GetStats(ctx context.Context) (map[string]int, error) {
 	stats := make(map[string]int)
 	rows, err := r.db.Query(ctx, `SELECT gender, COUNT(*) FROM students GROUP BY gender`)
