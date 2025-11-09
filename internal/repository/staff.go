@@ -58,7 +58,11 @@ func (r *StaffRepository) GetAll(ctx context.Context, schoolID *int, f StaffFilt
 		where = append(where, fmt.Sprintf("school_id=$%d", i))
 		args = append(args, *schoolID)
 		i++
+	} else {
+		// 🔒 safety: если schoolID == nil, вернётся пустой результат
+		where = append(where, "1=0")
 	}
+
 	if f.FullName != "" {
 		where = append(where, fmt.Sprintf("LOWER(full_name) ILIKE $%d", i))
 		args = append(args, "%"+strings.ToLower(f.FullName)+"%")

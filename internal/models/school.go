@@ -16,6 +16,6 @@ type School struct {
 	ClassCount   int       `json:"class_count"`
 	StudentCount int       `json:"student_count"`
 	UserID       int       `json:"user_id"`
-	User         *UserInfo `json:"user,omitempty"` // 🔹 вложенный объект
+	User         *UserInfo `json:"user,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 }
