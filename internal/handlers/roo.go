@@ -38,19 +38,17 @@ type registerSchoolRequest struct {
 }
 
 // RegisterSchool godoc
-// @Summary Регистрация новой школы
-// @Description Доступно только для ROO. Создаёт пользователя с ролью `school` и запись в таблице `schools`.
+// @Summary Регистрация школы (ROO)
+// @Description Создаёт школу и генерирует пароль автоматически.
 // @Tags ROO
 // @Accept json
 // @Produce json
-// @Param request body registerSchoolRequest true "Данные новой школы"
-// @Success 201 {object} map[string]string "{"status": "school registered"}"
+// @Param input body registerSchoolRequest true "Данные для регистрации"
+// @Success 201 {object} map[string]string
 // @Failure 400 {object} helpers.ErrorResponse
-// @Failure 401 {object} helpers.ErrorResponse
-// @Failure 403 {object} helpers.ErrorResponse
 // @Failure 500 {object} helpers.ErrorResponse
 // @Security BearerAuth
-// @Router /roo/register_school [post]
+// @Router /roo/register-school [post]
 func (h *RooHandler) RegisterSchool(w http.ResponseWriter, r *http.Request) {
 	var req registerSchoolRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -58,17 +56,22 @@ func (h *RooHandler) RegisterSchool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.RegisterSchool(
+	password, err := h.svc.RegisterSchool(
 		context.Background(),
 		req.Email,
-		req.Password,
 		req.Name,
 		req.Director,
 		h.schoolRepo,
-	); err != nil {
+	)
+	if err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "failed to register school")
 		return
 	}
 
-	helpers.JSON(w, http.StatusCreated, map[string]string{"status": "school registered"})
+	// Возвращаем сгенерированный пароль, чтобы ROO мог передать школе
+	helpers.JSON(w, http.StatusCreated, map[string]string{
+		"status":   "school registered",
+		"email":    req.Email,
+		"password": password,
+	})
 }
