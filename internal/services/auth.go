@@ -26,27 +26,52 @@ func NewAuthService(repo *repository.UserRepository, jwt *jwtauth.JWTAuth) *Auth
 func (s *AuthService) Login(ctx context.Context, email, password string) (string, error) {
 	u, err := s.repo.FindByEmail(ctx, email)
 	if err != nil {
+		// не раскрываем, существует ли пользователь
+		time.Sleep(150 * time.Millisecond)
 		return "", errors.New("invalid email or password")
 	}
 
+	// сравнение пароля
+	passBytes := []byte(password)
+	dbPassBytes := []byte(u.Password)
+
 	switch u.Role {
 	case "roo":
-		if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)); err != nil {
+		// админские — хэшированные
+		if err := bcrypt.CompareHashAndPassword(dbPassBytes, passBytes); err != nil {
+			time.Sleep(150 * time.Millisecond)
 			return "", errors.New("invalid email or password")
 		}
-
 	default:
+		// школы — пока в чистом виде (на проде можно захэшировать)
 		if u.Password != password {
+			time.Sleep(150 * time.Millisecond)
 			return "", errors.New("invalid email or password")
 		}
 	}
 
-	// ✅ Генерируем JWT
-	_, tokenStr, _ := s.jwt.Encode(map[string]interface{}{
+	// базовые клеймы
+	claims := map[string]interface{}{
 		"user_id": u.ID,
 		"role":    u.Role,
 		"exp":     time.Now().Add(s.tokenExp).Unix(),
-	})
+	}
+
+	// если школа — добавляем school_name
+	if u.Role == "school" {
+		schoolRepo := repository.NewSchoolRepository(s.repo.DB())
+		if school, err := schoolRepo.GetByUserID(ctx, u.ID); err == nil {
+			claims["school_name"] = school.Name
+			claims["school_id"] = school.ID
+		}
+	}
+
+	// формируем JWT
+	_, tokenStr, err := s.jwt.Encode(claims)
+	if err != nil {
+		return "", errors.New("failed to generate token")
+	}
+
 	return tokenStr, nil
 }
 
