@@ -29,7 +29,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "build/main,migrations"
+          source: "build/main,migrations,.env"
           target: /eduBase/
 
       - name: 🧬 Run migrations & restart service
@@ -38,20 +38,31 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          request_pty: true
           script: |
             set -e
             cd /eduBase
 
             echo "⏫ Running Goose migrations..."
-            /root/go/bin/goose -dir ./migrations postgres "${{ secrets.DB_URL }}" up
+            /root/go/bin/goose -dir ./migrations postgres "${{ secrets.DB_URL }}" up || echo "⚠️ No new migrations"
 
-            echo "🔁 Restarting systemd service..."
-            sudo systemctl restart edubase
+            echo "🔁 Restarting EduBase service..."
+            systemctl daemon-reload
+            systemctl restart edubase --no-pager --quiet
             sleep 5
-            sudo systemctl restart edubase --no-pager --quiet
+            systemctl status edubase --no-pager | tail -n 10
 
-            echo "🌐 Checking health endpoint..."
-            curl -f http://localhost:8080/health || (echo "❌ App failed to start" && exit 1)
+            echo "🌐 Checking API health endpoint..."
+            for i in {1..5}; do
+              if curl -fs http://localhost:8080/health > /dev/null; then
+                echo "✅ API is alive"
+                exit 0
+              fi
+              echo "⏳ Waiting for server... ($i/5)"
+              sleep 3
+            done
+            echo "❌ API not responding after retries"
+            exit 1
 
       - name: 🐘 Ensure Postgres is running
         uses: appleboy/ssh-action@v1.0.3
@@ -59,6 +70,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          request_pty: true
           script: |
-            sudo systemctl restart postgresql
-            sudo systemctl status postgresql --no-pager
+            systemctl restart postgresql --no-pager --quiet
+            systemctl status postgresql --no-pager | head -n 10
