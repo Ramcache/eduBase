@@ -37,3 +37,7 @@ func (r *UserRepository) Create(ctx context.Context, u *models.User) error {
 	`, u.Email, u.Password, u.Role)
 	return err
 }
+
+func (r *UserRepository) DB() *pgx.Conn {
+	return r.db
+}
