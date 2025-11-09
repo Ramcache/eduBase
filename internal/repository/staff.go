@@ -15,6 +15,7 @@ type StaffFilter struct {
 	FullName        string
 	Phone           string
 	Position        string
+	Subject         string
 	Education       string
 	Category        string
 	PedExperience   *int
@@ -34,21 +35,19 @@ var ErrStaffNotFound = errors.New("staff not found")
 func (r *StaffRepository) Create(ctx context.Context, s *models.Staff) error {
 	query := `
 	INSERT INTO staff (
-		full_name, phone, position, education, category,
+		full_name, phone, position, subject, education, category,
 		ped_experience, total_experience, work_start, note, school_id
-	) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+	) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 	RETURNING id, created_at`
 	return r.db.QueryRow(ctx, query,
-		s.FullName, s.Phone, s.Position,
-		s.Education, s.Category,
-		s.PedExperience, s.TotalExperience,
-		s.WorkStart, s.Note, s.SchoolID,
+		s.FullName, s.Phone, s.Position, s.Subject, s.Education, s.Category,
+		s.PedExperience, s.TotalExperience, s.WorkStart, s.Note, s.SchoolID,
 	).Scan(&s.ID, &s.CreatedAt)
 }
 
 func (r *StaffRepository) GetAll(ctx context.Context, schoolID *int, f StaffFilter) ([]models.Staff, error) {
 	base := `
-	SELECT id, full_name, phone, position, education, category,
+	SELECT id, full_name, phone, position, subject, education, category,
 	       ped_experience, total_experience, work_start, note, school_id, created_at
 	FROM staff`
 	var where []string
@@ -65,26 +64,17 @@ func (r *StaffRepository) GetAll(ctx context.Context, schoolID *int, f StaffFilt
 		args = append(args, "%"+strings.ToLower(f.FullName)+"%")
 		i++
 	}
-	if f.Phone != "" {
-		where = append(where, fmt.Sprintf("phone ILIKE $%d", i))
-		args = append(args, "%"+f.Phone+"%")
-		i++
-	}
 	if f.Position != "" {
 		where = append(where, fmt.Sprintf("LOWER(position) ILIKE $%d", i))
 		args = append(args, "%"+strings.ToLower(f.Position)+"%")
 		i++
 	}
-	if f.Education != "" {
-		where = append(where, fmt.Sprintf("LOWER(education) ILIKE $%d", i))
-		args = append(args, "%"+strings.ToLower(f.Education)+"%")
+	if f.Subject != "" {
+		where = append(where, fmt.Sprintf("LOWER(subject) ILIKE $%d", i))
+		args = append(args, "%"+strings.ToLower(f.Subject)+"%")
 		i++
 	}
-	if f.Category != "" {
-		where = append(where, fmt.Sprintf("LOWER(category) ILIKE $%d", i))
-		args = append(args, "%"+strings.ToLower(f.Category)+"%")
-		i++
-	}
+
 	query := base
 	if len(where) > 0 {
 		query += " WHERE " + strings.Join(where, " AND ")
@@ -101,8 +91,9 @@ func (r *StaffRepository) GetAll(ctx context.Context, schoolID *int, f StaffFilt
 	for rows.Next() {
 		var s models.Staff
 		if err := rows.Scan(
-			&s.ID, &s.FullName, &s.Phone, &s.Position, &s.Education, &s.Category,
-			&s.PedExperience, &s.TotalExperience, &s.WorkStart, &s.Note, &s.SchoolID, &s.CreatedAt,
+			&s.ID, &s.FullName, &s.Phone, &s.Position, &s.Subject, &s.Education,
+			&s.Category, &s.PedExperience, &s.TotalExperience,
+			&s.WorkStart, &s.Note, &s.SchoolID, &s.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -147,21 +138,21 @@ func (r *StaffRepository) Update(ctx context.Context, id int, s *models.Staff, r
 	if role == "roo" {
 		res, err = r.db.Exec(ctx, `
 			UPDATE staff
-			SET full_name=$1, phone=$2, position=$3, education=$4,
-			    category=$5, ped_experience=$6, total_experience=$7,
-			    work_start=$8, note=$9
-			WHERE id=$10`,
-			s.FullName, s.Phone, s.Position, s.Education, s.Category,
+			SET full_name=$1, phone=$2, position=$3, subject=$4,
+			    education=$5, category=$6, ped_experience=$7,
+			    total_experience=$8, work_start=$9, note=$10
+			WHERE id=$11`,
+			s.FullName, s.Phone, s.Position, s.Subject, s.Education, s.Category,
 			s.PedExperience, s.TotalExperience, s.WorkStart, s.Note, id,
 		)
 	} else {
 		res, err = r.db.Exec(ctx, `
 			UPDATE staff
-			SET full_name=$1, phone=$2, position=$3, education=$4,
-			    category=$5, ped_experience=$6, total_experience=$7,
-			    work_start=$8, note=$9
-			WHERE id=$10 AND school_id=$11`,
-			s.FullName, s.Phone, s.Position, s.Education, s.Category,
+			SET full_name=$1, phone=$2, position=$3, subject=$4,
+			    education=$5, category=$6, ped_experience=$7,
+			    total_experience=$8, work_start=$9, note=$10
+			WHERE id=$11 AND school_id=$12`,
+			s.FullName, s.Phone, s.Position, s.Subject, s.Education, s.Category,
 			s.PedExperience, s.TotalExperience, s.WorkStart, s.Note, id, s.SchoolID,
 		)
 	}

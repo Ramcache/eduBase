@@ -7,6 +7,7 @@ type Staff struct {
 	FullName        string     `json:"full_name" validate:"required"`
 	Phone           string     `json:"phone" validate:"required"`
 	Position        string     `json:"position" validate:"required"`
+	Subject         *string    `json:"subject,omitempty"`
 	Education       *string    `json:"education,omitempty"`
 	Category        *string    `json:"category,omitempty"`
 	PedExperience   *int       `json:"ped_experience,omitempty"`

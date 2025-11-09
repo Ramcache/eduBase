@@ -183,6 +183,7 @@ func (h *StaffHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		FullName:  r.URL.Query().Get("full_name"),
 		Phone:     r.URL.Query().Get("phone"),
 		Position:  r.URL.Query().Get("position"),
+		Subject:   r.URL.Query().Get("subject"),
 		Education: r.URL.Query().Get("education"),
 		Category:  r.URL.Query().Get("category"),
 	}
