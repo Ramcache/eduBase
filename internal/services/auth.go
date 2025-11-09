@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"eduBase/internal/utils"
 	"errors"
 	"github.com/go-chi/jwtauth/v5"
 	"time"
@@ -28,10 +29,19 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 		return "", errors.New("invalid email or password")
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)); err != nil {
-		return "", errors.New("invalid email or password")
+	switch u.Role {
+	case "roo":
+		if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password)); err != nil {
+			return "", errors.New("invalid email or password")
+		}
+
+	default:
+		if u.Password != password {
+			return "", errors.New("invalid email or password")
+		}
 	}
 
+	// ✅ Генерируем JWT
 	_, tokenStr, _ := s.jwt.Encode(map[string]interface{}{
 		"user_id": u.ID,
 		"role":    u.Role,
@@ -40,33 +50,37 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 	return tokenStr, nil
 }
 
-func (s *AuthService) RegisterSchool(ctx context.Context, email, password, name, director string, schoolRepo *repository.SchoolRepository) error {
-	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+func (s *AuthService) RegisterSchool(ctx context.Context, email, name, director string, schoolRepo *repository.SchoolRepository) (string, error) {
+	// 1. генерируем пароль
+	password, err := utils.GeneratePassword(8)
+	if err != nil {
+		return "", errors.New("failed to generate password")
+	}
 
-	// 1. создаём пользователя
+	// 2. создаём пользователя с ролью school (plain password)
 	u := &models.User{
 		Email:    email,
-		Password: string(hash),
+		Password: password, // сохраняем без хеша
 		Role:     "school",
 	}
 	if err := s.repo.Create(ctx, u); err != nil {
-		return err
+		return "", err
 	}
 
-	// 2. ищем его id
+	// 3. ищем id
 	user, err := s.repo.FindByEmail(ctx, email)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	// 3. создаём школу
+	// 4. создаём школу
 	school := &models.School{
 		Name:     name,
 		Director: director,
 	}
 	if err := schoolRepo.Create(ctx, school, user.ID); err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return password, nil
 }

@@ -30,8 +30,12 @@ func (r *SchoolRepository) Create(ctx context.Context, s *models.School, userID 
 
 func (r *SchoolRepository) GetAll(ctx context.Context) ([]models.School, error) {
 	rows, err := r.db.Query(ctx, `
-		SELECT id, name, director, class_count, student_count, created_at
-		FROM schools ORDER BY id
+		SELECT 
+			s.id, s.name, s.director, s.class_count, s.student_count, s.user_id, s.created_at,
+			u.id, u.email, u.password, u.role
+		FROM schools s
+		JOIN users u ON u.id = s.user_id
+		ORDER BY s.id
 	`)
 	if err != nil {
 		return nil, err
@@ -41,9 +45,25 @@ func (r *SchoolRepository) GetAll(ctx context.Context) ([]models.School, error) 
 	var list []models.School
 	for rows.Next() {
 		var s models.School
-		if err := rows.Scan(&s.ID, &s.Name, &s.Director, &s.ClassCount, &s.StudentCount, &s.CreatedAt); err != nil {
+		var u models.UserInfo
+
+		if err := rows.Scan(
+			&s.ID,
+			&s.Name,
+			&s.Director,
+			&s.ClassCount,
+			&s.StudentCount,
+			&s.UserID,
+			&s.CreatedAt,
+			&u.ID,
+			&u.Email,
+			&u.Password,
+			&u.Role,
+		); err != nil {
 			return nil, err
 		}
+
+		s.User = &u
 		list = append(list, s)
 	}
 	return list, nil
@@ -51,16 +71,37 @@ func (r *SchoolRepository) GetAll(ctx context.Context) ([]models.School, error) 
 
 func (r *SchoolRepository) GetByID(ctx context.Context, id int) (*models.School, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT id, name, director, class_count, student_count, created_at
-		FROM schools WHERE id=$1
+		SELECT 
+			s.id, s.name, s.director, s.class_count, s.student_count, s.user_id, s.created_at,
+			u.id, u.email, u.password, u.role
+		FROM schools s
+		JOIN users u ON u.id = s.user_id
+		WHERE s.id = $1
 	`, id)
+
 	var s models.School
-	if err := row.Scan(&s.ID, &s.Name, &s.Director, &s.ClassCount, &s.StudentCount, &s.CreatedAt); err != nil {
+	var u models.UserInfo
+
+	if err := row.Scan(
+		&s.ID,
+		&s.Name,
+		&s.Director,
+		&s.ClassCount,
+		&s.StudentCount,
+		&s.UserID,
+		&s.CreatedAt,
+		&u.ID,
+		&u.Email,
+		&u.Password,
+		&u.Role,
+	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSchoolNotFound
 		}
 		return nil, err
 	}
+
+	s.User = &u
 	return &s, nil
 }
 
