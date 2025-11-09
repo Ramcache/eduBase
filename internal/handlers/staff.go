@@ -148,20 +148,6 @@ func (h *StaffHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 	helpers.JSON(w, http.StatusOK, stats)
 }
 
-// GetAll godoc
-// @Summary Получить список сотрудников
-// @Description ROO — все, School — только свои. Поддерживает фильтры по всем полям.
-// @Tags Staff
-// @Produce json
-// @Param full_name query string false "ФИО"
-// @Param phone query string false "Телефон"
-// @Param position query string false "Должность"
-// @Param education query string false "Образование"
-// @Param category query string false "Категория"
-// @Security BearerAuth
-// @Success 200 {array} models.Staff
-// @Failure 500 {object} helpers.ErrorResponse
-// @Router /staff [get]
 func (h *StaffHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	_, claims, _ := jwtauth.FromContext(r.Context())
@@ -169,6 +155,8 @@ func (h *StaffHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	userID := int(claims["user_id"].(float64))
 
 	var schoolID *int
+
+	// 🔒 Школа видит только свои данные
 	if role == "school" {
 		schoolRepo := repository.NewSchoolRepository(h.svc.RepoDB())
 		school, err := schoolRepo.GetByUserID(ctx, userID)
@@ -179,6 +167,12 @@ func (h *StaffHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		schoolID = &school.ID
 	}
 
+	if role != "roo" && role != "school" {
+		helpers.Error(w, http.StatusForbidden, "access denied")
+		return
+	}
+
+	// Фильтры
 	filter := repository.StaffFilter{
 		FullName:  r.URL.Query().Get("full_name"),
 		Phone:     r.URL.Query().Get("phone"),
@@ -193,6 +187,7 @@ func (h *StaffHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		helpers.Error(w, http.StatusInternalServerError, "failed to get staff")
 		return
 	}
+
 	helpers.JSON(w, http.StatusOK, list)
 }
 
