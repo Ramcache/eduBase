@@ -96,6 +96,17 @@ definitions:
     - phone
     - position
     type: object
+  models.StatsSummary:
+    properties:
+      classes:
+        type: integer
+      staff_total:
+        type: integer
+      students:
+        type: integer
+      teachers:
+        type: integer
+    type: object
   models.Student:
     properties:
       address:
@@ -678,6 +689,39 @@ paths:
       summary: Получить статистику по персоналу (ROO)
       tags:
       - Staff
+  /stats/summary:
+    get:
+      description: ROO — вся система или по school_id; School — только своя школа
+        (параметр игнорируется)
+      parameters:
+      - description: Фильтрация по школе (только для ROO)
+        in: query
+        name: school_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.StatsSummary'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Сводная статистика (кол-во классов, учеников, учителей)
+      tags:
+      - Stats
   /students:
     get:
       parameters:

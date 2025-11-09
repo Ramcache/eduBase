@@ -50,6 +50,7 @@ func main() {
 	classRepo := repository.NewClassRepository(conn)
 	staffRepo := repository.NewStaffRepository(conn)
 	studentRepo := repository.NewStudentRepository(conn)
+	statsRepo := repository.NewStatsRepository(conn)
 
 	// === Services ===
 	authSvc := services.NewAuthService(userRepo, jwtAuth)
@@ -57,6 +58,8 @@ func main() {
 	classSvc := services.NewClassService(classRepo)
 	staffSvc := services.NewStaffService(staffRepo)
 	studentSvc := services.NewStudentService(studentRepo, classRepo, schoolRepo)
+	statsSvc := services.NewStatsService(statsRepo, schoolRepo)
+
 	// === Handlers ===
 	authHandler := handlers.NewAuthHandler(authSvc)
 	rooHandler := handlers.NewRooHandler(authSvc, schoolRepo)
@@ -64,6 +67,7 @@ func main() {
 	classHandler := handlers.NewClassHandler(classSvc)
 	staffHandler := handlers.NewStaffHandler(staffSvc)
 	studentHandler := handlers.NewStudentHandler(studentSvc)
+	statsHandler := handlers.NewStatsHandler(statsSvc)
 
 	CreateDefaultAdmin(context.Background(), userRepo, logg)
 	// === Router ===
@@ -113,6 +117,12 @@ func main() {
 		r.Use(middleware.Authenticator(jwtAuth))
 		r.Use(middleware.RequireAnyRole("roo", "school"))
 		studentHandler.Routes(r)
+	})
+	// для аутентифицированных пользователей (roo, school)
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Authenticator(jwtAuth))
+		r.Use(middleware.RequireAnyRole("roo", "school"))
+		statsHandler.Routes(r)
 	})
 
 	logg.Infof("📘 Swagger: http://localhost:%s/docs/index.html", cfg.AppPort)

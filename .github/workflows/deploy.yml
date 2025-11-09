@@ -48,7 +48,7 @@ jobs:
             echo "🔁 Restarting systemd service..."
             sudo systemctl restart edubase
             sleep 5
-            sudo systemctl status edubase --no-pager
+            sudo systemctl restart edubase --no-pager --quiet
 
             echo "🌐 Checking health endpoint..."
             curl -f http://localhost:8080/health || (echo "❌ App failed to start" && exit 1)
