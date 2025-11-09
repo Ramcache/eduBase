@@ -879,6 +879,57 @@ const docTemplate = `{
                 }
             }
         },
+        "/stats/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "ROO — вся система или по school_id; School — только своя школа (параметр игнорируется)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stats"
+                ],
+                "summary": "Сводная статистика (кол-во классов, учеников, учителей)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Фильтрация по школе (только для ROO)",
+                        "name": "school_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.StatsSummary"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/students": {
             "get": {
                 "security": [
@@ -1332,6 +1383,23 @@ const docTemplate = `{
                 },
                 "work_start": {
                     "type": "string"
+                }
+            }
+        },
+        "models.StatsSummary": {
+            "type": "object",
+            "properties": {
+                "classes": {
+                    "type": "integer"
+                },
+                "staff_total": {
+                    "type": "integer"
+                },
+                "students": {
+                    "type": "integer"
+                },
+                "teachers": {
+                    "type": "integer"
                 }
             }
         },
