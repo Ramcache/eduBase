@@ -8,7 +8,6 @@ import (
 
 	"eduBase/internal/helpers"
 	"eduBase/internal/models"
-	"eduBase/internal/repository"
 	"eduBase/internal/services"
 
 	"github.com/go-chi/chi/v5"
@@ -50,22 +49,12 @@ func (h *ClassHandler) GetClasses(w http.ResponseWriter, r *http.Request) {
 	role := claims["role"].(string)
 	userID := int(claims["user_id"].(float64))
 
-	var res []models.Class
-	var err error
-
-	if role == "roo" {
-		res, err = h.svc.GetAll(ctx)
-	} else if role == "school" {
-		schoolRepo := repository.NewSchoolRepository(h.svc.RepoDB())
-		school, errGet := schoolRepo.GetByUserID(ctx, userID)
-		if errGet != nil {
-			helpers.Error(w, http.StatusForbidden, "school not found")
+	res, err := h.svc.GetAll(ctx, role, userID)
+	if err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
 			return
 		}
-		res, err = h.svc.GetBySchool(ctx, school.ID)
-	}
-
-	if err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "failed to get classes")
 		return
 	}
@@ -96,18 +85,17 @@ func (h *ClassHandler) Create(w http.ResponseWriter, r *http.Request) {
 		helpers.Error(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-
-	if role == "school" {
-		schoolRepo := repository.NewSchoolRepository(h.svc.RepoDB())
-		school, err := schoolRepo.GetByUserID(ctx, userID)
-		if err != nil {
-			helpers.Error(w, http.StatusForbidden, "school not found")
-			return
-		}
-		c.SchoolID = school.ID
+	// Grade — int, поэтому проверяем на 0 (или <1)
+	if c.Name == "" || c.Grade == 0 {
+		helpers.Error(w, http.StatusBadRequest, "name and grade required")
+		return
 	}
 
-	if err := h.svc.Create(ctx, &c); err != nil {
+	if err := h.svc.Create(ctx, &c, role, userID); err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "only schools can create classes")
+			return
+		}
 		helpers.Error(w, http.StatusInternalServerError, "failed to create class")
 		return
 	}
@@ -141,24 +129,23 @@ func (h *ClassHandler) Update(w http.ResponseWriter, r *http.Request) {
 		helpers.Error(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-
-	if role == "school" {
-		schoolRepo := repository.NewSchoolRepository(h.svc.RepoDB())
-		school, err := schoolRepo.GetByUserID(ctx, userID)
-		if err != nil {
-			helpers.Error(w, http.StatusForbidden, "school not found")
-			return
-		}
-		c.SchoolID = school.ID
+	// тоже меняем проверку
+	if c.Name == "" || c.Grade == 0 {
+		helpers.Error(w, http.StatusBadRequest, "name and grade required")
+		return
 	}
 
-	ok, err := h.svc.Update(ctx, id, &c, role)
+	ok, err := h.svc.Update(ctx, id, &c, role, userID)
 	if err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
+			return
+		}
 		helpers.Error(w, http.StatusInternalServerError, "failed to update class")
 		return
 	}
 	if !ok {
-		helpers.Error(w, http.StatusNotFound, "class not found or not yours")
+		helpers.Error(w, http.StatusNotFound, "class not found")
 		return
 	}
 
@@ -183,20 +170,18 @@ func (h *ClassHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID := int(claims["user_id"].(float64))
 
 	id, _ := strconv.Atoi(chi.URLParam(r, "id"))
-	schoolID := 0
 
-	if role == "school" {
-		schoolRepo := repository.NewSchoolRepository(h.svc.RepoDB())
-		school, err := schoolRepo.GetByUserID(ctx, userID)
-		if err != nil {
-			helpers.Error(w, http.StatusForbidden, "school not found")
+	ok, err := h.svc.Delete(ctx, id, role, userID)
+	if err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
 			return
 		}
-		schoolID = school.ID
-	}
-
-	if err := h.svc.Delete(ctx, id, schoolID); err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "failed to delete class")
+		return
+	}
+	if !ok {
+		helpers.Error(w, http.StatusNotFound, "class not found")
 		return
 	}
 	helpers.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
@@ -221,24 +206,14 @@ func (h *ClassHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	userID := int(claims["user_id"].(float64))
 
 	id, _ := strconv.Atoi(chi.URLParam(r, "id"))
-	class, err := h.svc.GetByID(ctx, id)
+	class, err := h.svc.GetByID(ctx, id, role, userID)
 	if err != nil {
-		helpers.Error(w, http.StatusNotFound, "class not found")
-		return
-	}
-
-	// Проверка доступа: если School, то только свой класс
-	if role == "school" {
-		schoolRepo := repository.NewSchoolRepository(h.svc.RepoDB())
-		school, err := schoolRepo.GetByUserID(ctx, userID)
-		if err != nil {
-			helpers.Error(w, http.StatusForbidden, "school not found")
-			return
-		}
-		if class.SchoolID != school.ID {
+		if err.Error() == "access denied" {
 			helpers.Error(w, http.StatusForbidden, "access denied")
 			return
 		}
+		helpers.Error(w, http.StatusNotFound, "class not found")
+		return
 	}
 
 	helpers.JSON(w, http.StatusOK, class)

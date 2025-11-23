@@ -55,7 +55,7 @@ func main() {
 	// === Services ===
 	authSvc := services.NewAuthService(userRepo, jwtAuth)
 	schoolSvc := services.NewSchoolService(schoolRepo)
-	classSvc := services.NewClassService(classRepo)
+	classSvc := services.NewClassService(classRepo, schoolRepo)
 	staffSvc := services.NewStaffService(staffRepo)
 	studentSvc := services.NewStudentService(studentRepo, classRepo, schoolRepo)
 	statsSvc := services.NewStatsService(statsRepo, schoolRepo)
@@ -64,12 +64,16 @@ func main() {
 	authHandler := handlers.NewAuthHandler(authSvc)
 	rooHandler := handlers.NewRooHandler(authSvc, schoolRepo)
 	rooSchoolHandler := handlers.NewRooSchoolHandler(schoolSvc)
+	schoolSelfHandler := handlers.NewSchoolSelfHandler(schoolSvc)
+
 	classHandler := handlers.NewClassHandler(classSvc)
 	staffHandler := handlers.NewStaffHandler(staffSvc)
 	studentHandler := handlers.NewStudentHandler(studentSvc)
 	statsHandler := handlers.NewStatsHandler(statsSvc)
 
+	// создаём дефолтного админа (ROO)
 	CreateDefaultAdmin(context.Background(), userRepo, logg)
+
 	// === Router ===
 	r := chi.NewRouter()
 
@@ -78,50 +82,53 @@ func main() {
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 		MaxAge:           300,
 	}))
 
-	// JWT middleware
+	// JWT verifier (разбирает токен и кладёт клеймы в контекст)
 	r.Use(middleware.JWTVerifier(jwtAuth))
 
 	// Public
-	r.Get("/swagger/*", httpSwagger.WrapHandler)
+	r.Get("/docs/*", httpSwagger.WrapHandler)
 	r.Get("/health", handlers.HealthHandler)
+
+	// Auth
 	r.Group(func(r chi.Router) {
 		authHandler.Routes(r)
 	})
 
+	// ================================
 	// ROO-only
+	// ================================
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Authenticator(jwtAuth))
 		r.Use(middleware.RequireRole("roo"))
+
 		rooHandler.Routes(r)
 		rooSchoolHandler.Routes(r)
 	})
 
-	// ROO or School (shared)
+	// ================================
+	// SCHOOL-only: работа со своей школой
+	// ================================
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Authenticator(jwtAuth))
+		r.Use(middleware.RequireRole("school"))
+
+		schoolSelfHandler.Routes(r) // /school/me
+	})
+
+	// ================================
+	// ROO или SCHOOL — общие сущности
+	// ================================
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Authenticator(jwtAuth))
 		r.Use(middleware.RequireAnyRole("roo", "school"))
+
 		classHandler.Routes(r)
-	})
-
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.Authenticator(jwtAuth))
-		r.Use(middleware.RequireAnyRole("roo", "school"))
 		staffHandler.Routes(r)
-	})
-
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.Authenticator(jwtAuth))
-		r.Use(middleware.RequireAnyRole("roo", "school"))
 		studentHandler.Routes(r)
-	})
-	// для аутентифицированных пользователей (roo, school)
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.Authenticator(jwtAuth))
-		r.Use(middleware.RequireAnyRole("roo", "school"))
 		statsHandler.Routes(r)
 	})
 
@@ -130,34 +137,33 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+cfg.AppPort, r))
 }
 
-func CreateDefaultAdmin(ctx context.Context, userRepo *repository.UserRepository, log *zap.SugaredLogger) {
-	adminEmail := "admin"
-	adminPass := "admin"
-	adminRole := "roo"
+func CreateDefaultAdmin(ctx context.Context, userRepo *repository.UserRepository, logg *zap.SugaredLogger) {
+	const defaultEmail = "admin"
+	const defaultPassword = "admin"
 
-	user, err := userRepo.FindByEmail(ctx, adminEmail)
+	user, err := userRepo.GetByEmail(ctx, defaultEmail)
 	if err == nil && user != nil {
-		log.Infow("admin_exists", "email", adminEmail)
+		logg.Infof("default admin already exists: %s", defaultEmail)
 		return
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(adminPass), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(defaultPassword), bcrypt.DefaultCost)
 	if err != nil {
-		log.Errorw("bcrypt_failed", "err", err)
+		logg.Errorf("failed to hash default admin password: %v", err)
 		return
 	}
 
-	admin := &models.User{
-		Email:    adminEmail,
+	u := &models.User{
+		Email:    defaultEmail,
 		Password: string(hash),
-		Role:     adminRole,
+		Role:     "roo",
 	}
 
-	if err := userRepo.Create(ctx, admin); err != nil {
-		log.Errorw("create_admin_failed", "err", err)
+	if err := userRepo.Create(ctx, u); err != nil {
+		logg.Errorf("failed to create default admin: %v", err)
 		return
 	}
 
-	log.Infow("admin_created", "email", adminEmail, "role", adminRole)
-	fmt.Println("✅ Admin user created: email=admin password=admin role=roo")
+	logg.Infof("✅ Default admin created: %s / %s", defaultEmail, defaultPassword)
+	fmt.Println("Default admin:", defaultEmail, defaultPassword)
 }

@@ -8,8 +8,11 @@ import (
 
 	"eduBase/internal/helpers"
 	"eduBase/internal/models"
+	"eduBase/internal/repository"
 	"eduBase/internal/services"
+
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/jwtauth/v5"
 )
 
 type RooSchoolHandler struct {
@@ -29,16 +32,32 @@ func (h *RooSchoolHandler) Routes(r chi.Router) {
 	})
 }
 
+// маленький хелпер, чтобы не дублировать проверку ROO
+func (h *RooSchoolHandler) requireRoo(w http.ResponseWriter, r *http.Request) bool {
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	role, ok := claims["role"].(string)
+	if !ok || role != "roo" {
+		helpers.Error(w, http.StatusForbidden, "access denied")
+		return false
+	}
+	return true
+}
+
 // GetAll godoc
 // @Summary      Получить все школы
 // @Description  Возвращает список всех школ (только для ROO)
 // @Tags         Schools
 // @Produce      json
 // @Success      200 {array} models.School
+// @Failure      403 {object} helpers.ErrorResponse
 // @Failure      500 {object} helpers.ErrorResponse
 // @Security     BearerAuth
 // @Router       /roo/schools [get]
 func (h *RooSchoolHandler) GetAll(w http.ResponseWriter, r *http.Request) {
+	if !h.requireRoo(w, r) {
+		return
+	}
+
 	list, err := h.svc.GetAll(context.Background())
 	if err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "failed to load schools")
@@ -54,15 +73,24 @@ func (h *RooSchoolHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        id path int true "ID школы"
 // @Success      200 {object} models.School
+// @Failure      403 {object} helpers.ErrorResponse
 // @Failure      404 {object} helpers.ErrorResponse
 // @Failure      500 {object} helpers.ErrorResponse
 // @Security     BearerAuth
 // @Router       /roo/schools/{id} [get]
 func (h *RooSchoolHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	if !h.requireRoo(w, r) {
+		return
+	}
+
 	id, _ := strconv.Atoi(chi.URLParam(r, "id"))
 	school, err := h.svc.GetByID(context.Background(), id)
 	if err != nil {
-		helpers.Error(w, http.StatusNotFound, "school not found")
+		if err == repository.ErrSchoolNotFound {
+			helpers.Error(w, http.StatusNotFound, "school not found")
+			return
+		}
+		helpers.Error(w, http.StatusInternalServerError, "failed to load school")
 		return
 	}
 	helpers.JSON(w, http.StatusOK, school)
@@ -78,16 +106,26 @@ func (h *RooSchoolHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 // @Param        request body models.School true "Поля для обновления"
 // @Success      200 {object} map[string]string
 // @Failure      400 {object} helpers.ErrorResponse
+// @Failure      403 {object} helpers.ErrorResponse
 // @Failure      500 {object} helpers.ErrorResponse
 // @Security     BearerAuth
 // @Router       /roo/schools/{id} [put]
 func (h *RooSchoolHandler) Update(w http.ResponseWriter, r *http.Request) {
+	if !h.requireRoo(w, r) {
+		return
+	}
+
 	id, _ := strconv.Atoi(chi.URLParam(r, "id"))
 	var req models.School
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		helpers.Error(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	if req.Name == "" {
+		helpers.Error(w, http.StatusBadRequest, "name required")
+		return
+	}
+
 	if err := h.svc.Update(context.Background(), id, &req); err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "failed to update school")
 		return
@@ -102,10 +140,15 @@ func (h *RooSchoolHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Produce      json
 // @Param        id path int true "ID школы"
 // @Success      200 {object} map[string]string
+// @Failure      403 {object} helpers.ErrorResponse
 // @Failure      500 {object} helpers.ErrorResponse
 // @Security     BearerAuth
 // @Router       /roo/schools/{id} [delete]
 func (h *RooSchoolHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	if !h.requireRoo(w, r) {
+		return
+	}
+
 	id, _ := strconv.Atoi(chi.URLParam(r, "id"))
 	if err := h.svc.Delete(context.Background(), id); err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "failed to delete school")

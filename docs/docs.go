@@ -329,14 +329,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/roo/register_school": {
+        "/roo/register-school": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "Доступно только для ROO. Создаёт пользователя с ролью ` + "`" + `school` + "`" + ` и запись в таблице ` + "`" + `schools` + "`" + `.",
+                "description": "Создаёт школу и генерирует пароль автоматически.",
                 "consumes": [
                     "application/json"
                 ],
@@ -346,11 +346,11 @@ const docTemplate = `{
                 "tags": [
                     "ROO"
                 ],
-                "summary": "Регистрация новой школы",
+                "summary": "Регистрация школы (ROO)",
                 "parameters": [
                     {
-                        "description": "Данные новой школы",
-                        "name": "request",
+                        "description": "Данные для регистрации",
+                        "name": "input",
                         "in": "body",
                         "required": true,
                         "schema": {
@@ -360,7 +360,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "201": {
-                        "description": "{\"status\": \"school registered\"}",
+                        "description": "Created",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -370,18 +370,6 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/helpers.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/helpers.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/helpers.ErrorResponse"
                         }
@@ -418,6 +406,12 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/models.School"
                             }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     },
                     "500": {
@@ -458,6 +452,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/models.School"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     },
                     "404": {
@@ -525,6 +525,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -566,6 +572,113 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/school/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Только для пользователей с ролью School",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Schools"
+                ],
+                "summary": "Получить данные своей школы",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.School"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Только для пользователей с ролью School",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Schools"
+                ],
+                "summary": "Обновить данные своей школы",
+                "parameters": [
+                    {
+                        "description": "Поля для обновления",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.School"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -582,7 +695,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "ROO — все, School — только свои. Поддерживает фильтры по всем полям.",
+                "description": "ROO — всех, School — только своих",
                 "produces": [
                     "application/json"
                 ],
@@ -611,6 +724,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "Предмет",
+                        "name": "subject",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Образование",
                         "name": "education",
                         "in": "query"
@@ -619,6 +738,30 @@ const docTemplate = `{
                         "type": "string",
                         "description": "Категория",
                         "name": "category",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Минимальный пед. стаж",
+                        "name": "ped_experience",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Минимальный общий стаж",
+                        "name": "total_experience",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Лимит на страницу",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Смещение",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -691,6 +834,92 @@ const docTemplate = `{
                         "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/staff/import": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "School — только в свою школу; ROO — может импортировать для любой школы (по логике сервиса).",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Staff"
+                ],
+                "summary": "Импорт сотрудников из Excel",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Excel файл (.xlsx)",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Строгий режим: если есть ошибки — никого не импортировать",
+                        "name": "strict",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/staff/import/template": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ],
+                "tags": [
+                    "Staff"
+                ],
+                "summary": "Скачать шаблон Excel для импорта сотрудников",
+                "responses": {
+                    "200": {
+                        "description": "Excel файл",
+                        "schema": {
+                            "type": "file"
                         }
                     }
                 }
@@ -870,6 +1099,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -904,7 +1139,7 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "schools, classes, students, teachers, staff_total",
                         "schema": {
                             "$ref": "#/definitions/models.StatsSummary"
                         }
@@ -961,6 +1196,42 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "ID класса",
                         "name": "class_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Нижняя граница класса (номер)",
+                        "name": "grade_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Верхняя граница класса (номер)",
+                        "name": "grade_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Минимальный возраст (лет)",
+                        "name": "age_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Максимальный возраст (лет)",
+                        "name": "age_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Лимит на страницу",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Смещение",
+                        "name": "offset",
                         "in": "query"
                     }
                 ],
@@ -1037,6 +1308,60 @@ const docTemplate = `{
                 }
             }
         },
+        "/students/age-stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает список {age, count} в заданном диапазоне возрастов (в годах).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Students"
+                ],
+                "summary": "Количество детей по возрастам",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Нижний возраст (лет)",
+                        "name": "age_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Верхний возраст (лет)",
+                        "name": "age_to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.AgeStat"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/students/export": {
             "get": {
                 "security": [
@@ -1056,6 +1381,146 @@ const docTemplate = `{
                         "description": "csv file",
                         "schema": {
                             "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/students/grade-stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает количество классов и учеников в заданном диапазоне классов.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Students"
+                ],
+                "summary": "Получить статистику по диапазону классов",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Нижняя граница класса (номер)",
+                        "name": "grade_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Верхняя граница класса (номер)",
+                        "name": "grade_to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/students/import": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "School — только в свою школу; ROO тоже можно использовать.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Students"
+                ],
+                "summary": "Импорт учеников из Excel",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Excel файл (.xlsx)",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Строгий режим: если есть ошибки — никого не импортировать",
+                        "name": "strict",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/students/import/template": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ],
+                "tags": [
+                    "Students"
+                ],
+                "summary": "Скачать шаблон Excel для импорта учеников",
+                "responses": {
+                    "200": {
+                        "description": "Excel файл",
+                        "schema": {
+                            "type": "file"
                         }
                     }
                 }
@@ -1232,6 +1697,18 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -1294,6 +1771,17 @@ const docTemplate = `{
                 }
             }
         },
+        "models.AgeStat": {
+            "type": "object",
+            "properties": {
+                "age": {
+                    "type": "integer"
+                },
+                "count": {
+                    "type": "integer"
+                }
+            }
+        },
         "models.Class": {
             "type": "object",
             "properties": {
@@ -1337,6 +1825,12 @@ const docTemplate = `{
                 },
                 "student_count": {
                     "type": "integer"
+                },
+                "user": {
+                    "$ref": "#/definitions/models.UserInfo"
+                },
+                "user_id": {
+                    "type": "integer"
                 }
             }
         },
@@ -1378,6 +1872,9 @@ const docTemplate = `{
                 "school_id": {
                     "type": "integer"
                 },
+                "subject": {
+                    "type": "string"
+                },
                 "total_experience": {
                     "type": "integer"
                 },
@@ -1390,6 +1887,9 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "classes": {
+                    "type": "integer"
+                },
+                "schools": {
                     "type": "integer"
                 },
                 "staff_total": {
@@ -1413,6 +1913,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "birth_date": {
+                    "type": "string"
+                },
+                "class": {
                     "type": "string"
                 },
                 "class_id": {
@@ -1440,6 +1943,23 @@ const docTemplate = `{
                     "type": "integer"
                 }
             }
+        },
+        "models.UserInfo": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
         }
     },
     "securityDefinitions": {
@@ -1461,8 +1981,6 @@ var SwaggerInfo = &swag.Spec{
 	Description:      "База школ с ролями ROO и School.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
-	LeftDelim:        "{{",
-	RightDelim:       "}}",
 }
 
 func init() {

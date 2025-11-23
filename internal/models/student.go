@@ -15,3 +15,8 @@ type Student struct {
 	SchoolID  int        `json:"school_id"`
 	CreatedAt time.Time  `json:"created_at"`
 }
+
+type AgeStat struct {
+	Age   int `json:"age"`
+	Count int `json:"count"`
+}
