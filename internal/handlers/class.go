@@ -85,7 +85,8 @@ func (h *ClassHandler) Create(w http.ResponseWriter, r *http.Request) {
 		helpers.Error(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	if c.Name == "" || c.Grade == "" {
+	// Grade — int, поэтому проверяем на 0 (или <1)
+	if c.Name == "" || c.Grade == 0 {
 		helpers.Error(w, http.StatusBadRequest, "name and grade required")
 		return
 	}
@@ -128,7 +129,8 @@ func (h *ClassHandler) Update(w http.ResponseWriter, r *http.Request) {
 		helpers.Error(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	if c.Name == "" || c.Grade == "" {
+	// тоже меняем проверку
+	if c.Name == "" || c.Grade == 0 {
 		helpers.Error(w, http.StatusBadRequest, "name and grade required")
 		return
 	}
