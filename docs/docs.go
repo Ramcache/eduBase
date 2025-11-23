@@ -1200,6 +1200,30 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
+                        "description": "Нижняя граница класса (номер)",
+                        "name": "grade_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Верхняя граница класса (номер)",
+                        "name": "grade_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Минимальный возраст (лет)",
+                        "name": "age_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Максимальный возраст (лет)",
+                        "name": "age_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
                         "description": "Лимит на страницу",
                         "name": "limit",
                         "in": "query"
@@ -1284,6 +1308,60 @@ const docTemplate = `{
                 }
             }
         },
+        "/students/age-stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает список {age, count} в заданном диапазоне возрастов (в годах).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Students"
+                ],
+                "summary": "Количество детей по возрастам",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Нижний возраст (лет)",
+                        "name": "age_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Верхний возраст (лет)",
+                        "name": "age_to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.AgeStat"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/students/export": {
             "get": {
                 "security": [
@@ -1303,6 +1381,60 @@ const docTemplate = `{
                         "description": "csv file",
                         "schema": {
                             "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/students/grade-stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Возвращает количество классов и учеников в заданном диапазоне классов.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Students"
+                ],
+                "summary": "Получить статистику по диапазону классов",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Нижняя граница класса (номер)",
+                        "name": "grade_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Верхняя граница класса (номер)",
+                        "name": "grade_to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
@@ -1636,6 +1768,17 @@ const docTemplate = `{
             "properties": {
                 "error": {
                     "type": "string"
+                }
+            }
+        },
+        "models.AgeStat": {
+            "type": "object",
+            "properties": {
+                "age": {
+                    "type": "integer"
+                },
+                "count": {
+                    "type": "integer"
                 }
             }
         },

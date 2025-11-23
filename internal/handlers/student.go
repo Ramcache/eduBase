@@ -32,6 +32,7 @@ func (h *StudentHandler) Routes(r chi.Router) {
 		r.Get("/{id}", h.GetByID)
 		r.Get("/stats", h.GetStats)
 		r.Get("/grade-stats", h.GetGradeStats)
+		r.Get("/age-stats", h.GetAgeStats)
 		r.Get("/import/template", h.ImportTemplate)
 		r.Get("/export", h.ExportCSV)
 		r.Post("/", h.Create)
@@ -189,13 +190,15 @@ func deref(p *string) string {
 // @Summary Получить список учеников
 // @Tags Students
 // @Produce json
-// @Param full_name query string false "ФИО"
-// @Param gender query string false "Пол (male/female)"
-// @Param class_id query int false "ID класса"
-// @Param grade_from query int false "Нижняя граница класса (номер)"
-// @Param grade_to query int false "Верхняя граница класса (номер)"
-// @Param limit query int false "Лимит на страницу"
-// @Param offset query int false "Смещение"
+// @Param full_name   query string false "ФИО"
+// @Param gender      query string false "Пол (male/female)"
+// @Param class_id    query int    false "ID класса"
+// @Param grade_from  query int    false "Нижняя граница класса (номер)"
+// @Param grade_to    query int    false "Верхняя граница класса (номер)"
+// @Param age_from    query int    false "Минимальный возраст (лет)"
+// @Param age_to      query int    false "Максимальный возраст (лет)"
+// @Param limit       query int    false "Лимит на страницу"
+// @Param offset      query int    false "Смещение"
 // @Security BearerAuth
 // @Success 200 {array} models.Student
 // @Failure 500 {object} helpers.ErrorResponse
@@ -229,6 +232,17 @@ func (h *StudentHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 			gradeToPtr = &n
 		}
 	}
+	var ageFromPtr, ageToPtr *int
+	if v := q.Get("age_from"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			ageFromPtr = &n
+		}
+	}
+	if v := q.Get("age_to"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			ageToPtr = &n
+		}
+	}
 
 	f := repository.StudentFilter{
 		FullName:  q.Get("full_name"),
@@ -236,6 +250,8 @@ func (h *StudentHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 		ClassID:   classIDPtr,
 		GradeFrom: gradeFromPtr,
 		GradeTo:   gradeToPtr,
+		AgeFrom:   ageFromPtr,
+		AgeTo:     ageToPtr,
 		Limit:     limit,
 		Offset:    offset,
 	}
@@ -577,4 +593,49 @@ func (h *StudentHandler) GetGradeStats(w http.ResponseWriter, r *http.Request) {
 		"classes":  classesCount,
 		"students": studentsCount,
 	})
+}
+
+// GetAgeStats godoc
+// @Summary Количество детей по возрастам
+// @Description Возвращает список {age, count} в заданном диапазоне возрастов (в годах).
+// @Tags Students
+// @Produce json
+// @Param age_from query int false "Нижний возраст (лет)"
+// @Param age_to query int false "Верхний возраст (лет)"
+// @Security BearerAuth
+// @Success 200 {array} models.AgeStat
+// @Failure 403 {object} helpers.ErrorResponse
+// @Failure 500 {object} helpers.ErrorResponse
+// @Router /students/age-stats [get]
+func (h *StudentHandler) GetAgeStats(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	role := claims["role"].(string)
+	userID := int(claims["user_id"].(float64))
+
+	q := r.URL.Query()
+
+	var ageFromPtr, ageToPtr *int
+	if v := q.Get("age_from"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			ageFromPtr = &n
+		}
+	}
+	if v := q.Get("age_to"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			ageToPtr = &n
+		}
+	}
+
+	stats, err := h.svc.GetAgeStats(ctx, role, userID, ageFromPtr, ageToPtr)
+	if err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
+			return
+		}
+		helpers.Error(w, http.StatusInternalServerError, "failed to get age stats")
+		return
+	}
+
+	helpers.JSON(w, http.StatusOK, stats)
 }

@@ -209,3 +209,27 @@ func (s *StudentService) GetGradeStats(ctx context.Context, role string, userID 
 
 	return s.repo.GetGradeStats(ctx, schoolID, gradeFrom, gradeTo)
 }
+
+func (s *StudentService) GetAgeStats(
+	ctx context.Context,
+	role string,
+	userID int,
+	ageFrom, ageTo *int,
+) ([]models.AgeStat, error) {
+	var schoolID *int
+
+	switch role {
+	case "roo":
+		// видит всех
+	case "school":
+		school, err := s.schoolRepo.GetByUserID(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		schoolID = &school.ID
+	default:
+		return nil, errors.New("access denied")
+	}
+
+	return s.repo.GetAgeStats(ctx, schoolID, ageFrom, ageTo)
+}

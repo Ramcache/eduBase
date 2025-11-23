@@ -35,6 +35,13 @@ definitions:
       error:
         type: string
     type: object
+  models.AgeStat:
+    properties:
+      age:
+        type: integer
+      count:
+        type: integer
+    type: object
   models.Class:
     properties:
       created_at:
@@ -908,6 +915,22 @@ paths:
         in: query
         name: class_id
         type: integer
+      - description: Нижняя граница класса (номер)
+        in: query
+        name: grade_from
+        type: integer
+      - description: Верхняя граница класса (номер)
+        in: query
+        name: grade_to
+        type: integer
+      - description: Минимальный возраст (лет)
+        in: query
+        name: age_from
+        type: integer
+      - description: Максимальный возраст (лет)
+        in: query
+        name: age_to
+        type: integer
       - description: Лимит на страницу
         in: query
         name: limit
@@ -1068,6 +1091,41 @@ paths:
       summary: Обновить данные ученика
       tags:
       - Students
+  /students/age-stats:
+    get:
+      description: Возвращает список {age, count} в заданном диапазоне возрастов (в
+        годах).
+      parameters:
+      - description: Нижний возраст (лет)
+        in: query
+        name: age_from
+        type: integer
+      - description: Верхний возраст (лет)
+        in: query
+        name: age_to
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.AgeStat'
+            type: array
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Количество детей по возрастам
+      tags:
+      - Students
   /students/export:
     get:
       produces:
@@ -1080,6 +1138,40 @@ paths:
       security:
       - BearerAuth: []
       summary: Экспорт учеников в CSV (только ROO)
+      tags:
+      - Students
+  /students/grade-stats:
+    get:
+      description: Возвращает количество классов и учеников в заданном диапазоне классов.
+      parameters:
+      - description: Нижняя граница класса (номер)
+        in: query
+        name: grade_from
+        type: integer
+      - description: Верхняя граница класса (номер)
+        in: query
+        name: grade_to
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить статистику по диапазону классов
       tags:
       - Students
   /students/import:

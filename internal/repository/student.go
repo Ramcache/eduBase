@@ -32,6 +32,9 @@ type StudentFilter struct {
 	GradeFrom *int
 	GradeTo   *int
 
+	AgeFrom *int
+	AgeTo   *int
+
 	Limit  int
 	Offset int
 }
@@ -87,6 +90,25 @@ func (r *StudentRepository) GetAll(ctx context.Context, schoolID *int, f Student
 	if f.GradeTo != nil {
 		where = append(where, fmt.Sprintf("c.grade <= $%d", i))
 		args = append(args, *f.GradeTo)
+		i++
+	}
+	if f.AgeFrom != nil || f.AgeTo != nil {
+		where = append(where, fmt.Sprintf(`
+		EXTRACT(YEAR FROM age(CURRENT_DATE, s.birth_date))::int 
+			IS NOT NULL`))
+	}
+
+	if f.AgeFrom != nil {
+		where = append(where, fmt.Sprintf(`
+		EXTRACT(YEAR FROM age(CURRENT_DATE, s.birth_date))::int >= $%d`, i))
+		args = append(args, *f.AgeFrom)
+		i++
+	}
+
+	if f.AgeTo != nil {
+		where = append(where, fmt.Sprintf(`
+		EXTRACT(YEAR FROM age(CURRENT_DATE, s.birth_date))::int <= $%d`, i))
+		args = append(args, *f.AgeTo)
 		i++
 	}
 
@@ -275,4 +297,62 @@ func (r *StudentRepository) GetGradeStats(ctx context.Context, schoolID *int, gr
 	}
 
 	return classCount, studentCount, nil
+}
+
+// GetAgeStats возвращает количество детей по возрастам (в годах)
+// в указанном диапазоне возрастов и с учётом schoolID (nil = все школы).
+func (r *StudentRepository) GetAgeStats(ctx context.Context, schoolID *int, ageFrom, ageTo *int) ([]models.AgeStat, error) {
+	base := `
+		SELECT s.age_years, COUNT(*)
+		FROM (
+			SELECT EXTRACT(YEAR FROM age(CURRENT_DATE, birth_date))::int AS age_years,
+			       school_id
+			FROM students
+			WHERE birth_date IS NOT NULL
+		) s`
+
+	where := []string{}
+	args := []any{}
+	i := 1
+
+	if schoolID != nil {
+		where = append(where, fmt.Sprintf("s.school_id=$%d", i))
+		args = append(args, *schoolID)
+		i++
+	}
+	if ageFrom != nil {
+		where = append(where, fmt.Sprintf("s.age_years >= $%d", i))
+		args = append(args, *ageFrom)
+		i++
+	}
+	if ageTo != nil {
+		where = append(where, fmt.Sprintf("s.age_years <= $%d", i))
+		args = append(args, *ageTo)
+		i++
+	}
+
+	query := base
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	query += " GROUP BY s.age_years ORDER BY s.age_years"
+
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var res []models.AgeStat
+	for rows.Next() {
+		var age, count int
+		if err := rows.Scan(&age, &count); err != nil {
+			return nil, err
+		}
+		res = append(res, models.AgeStat{
+			Age:   age,
+			Count: count,
+		})
+	}
+	return res, nil
 }
