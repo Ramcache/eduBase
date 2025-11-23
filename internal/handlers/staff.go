@@ -48,23 +48,19 @@ func (h *StaffHandler) Routes(r chi.Router) {
 func (h *StaffHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	id, _ := strconv.Atoi(chi.URLParam(r, "id"))
+
 	_, claims, _ := jwtauth.FromContext(r.Context())
 	role := claims["role"].(string)
 	userID := int(claims["user_id"].(float64))
 
-	staff, err := h.svc.GetByID(ctx, id)
+	staff, err := h.svc.GetByID(ctx, id, role, userID)
 	if err != nil {
-		helpers.Error(w, http.StatusNotFound, "staff not found")
-		return
-	}
-
-	if role == "school" {
-		schoolRepo := repository.NewSchoolRepository(h.svc.RepoDB())
-		school, err := schoolRepo.GetByUserID(ctx, userID)
-		if err != nil || staff.SchoolID != school.ID {
+		if err.Error() == "access denied" {
 			helpers.Error(w, http.StatusForbidden, "access denied")
 			return
 		}
+		helpers.Error(w, http.StatusNotFound, "staff not found")
+		return
 	}
 
 	helpers.JSON(w, http.StatusOK, staff)
@@ -86,6 +82,7 @@ func (h *StaffHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 func (h *StaffHandler) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	id, _ := strconv.Atoi(chi.URLParam(r, "id"))
+
 	_, claims, _ := jwtauth.FromContext(r.Context())
 	role := claims["role"].(string)
 	userID := int(claims["user_id"].(float64))
@@ -101,23 +98,17 @@ func (h *StaffHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if role == "school" {
-		schoolRepo := repository.NewSchoolRepository(h.svc.RepoDB())
-		school, err := schoolRepo.GetByUserID(ctx, userID)
-		if err != nil {
-			helpers.Error(w, http.StatusForbidden, "school not found")
+	ok, err := h.svc.Update(ctx, id, &s, role, userID)
+	if err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
 			return
 		}
-		s.SchoolID = school.ID
-	}
-
-	ok, err := h.svc.Update(ctx, id, &s, role)
-	if err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "failed to update staff")
 		return
 	}
 	if !ok {
-		helpers.Error(w, http.StatusNotFound, "staff not found or not yours")
+		helpers.Error(w, http.StatusNotFound, "staff not found")
 		return
 	}
 
@@ -134,56 +125,84 @@ func (h *StaffHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {object} helpers.ErrorResponse
 // @Router /staff/stats [get]
 func (h *StaffHandler) GetStats(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
 	_, claims, _ := jwtauth.FromContext(r.Context())
 	role := claims["role"].(string)
-	if role != "roo" {
-		helpers.Error(w, http.StatusForbidden, "access denied")
-		return
-	}
-	stats, err := h.svc.GetStats(context.Background())
+
+	stats, err := h.svc.GetStats(ctx, role)
 	if err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
+			return
+		}
 		helpers.Error(w, http.StatusInternalServerError, "failed to get stats")
 		return
 	}
+
 	helpers.JSON(w, http.StatusOK, stats)
 }
 
+// GetAll godoc
+// @Summary Получить список сотрудников
+// @Description ROO — всех, School — только своих
+// @Tags Staff
+// @Produce json
+// @Param full_name query string false "ФИО"
+// @Param phone query string false "Телефон"
+// @Param position query string false "Должность"
+// @Param subject query string false "Предмет"
+// @Param education query string false "Образование"
+// @Param category query string false "Категория"
+// @Param ped_experience query int false "Минимальный пед. стаж"
+// @Param total_experience query int false "Минимальный общий стаж"
+// @Param limit query int false "Лимит на страницу"
+// @Param offset query int false "Смещение"
+// @Security BearerAuth
+// @Success 200 {array} models.Staff
+// @Failure 500 {object} helpers.ErrorResponse
+// @Router /staff [get]
 func (h *StaffHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	_, claims, _ := jwtauth.FromContext(r.Context())
 	role := claims["role"].(string)
 	userID := int(claims["user_id"].(float64))
 
-	var schoolID *int
+	q := r.URL.Query()
 
-	// 🔒 Школа видит только свои данные
-	if role == "school" {
-		schoolRepo := repository.NewSchoolRepository(h.svc.RepoDB())
-		school, err := schoolRepo.GetByUserID(ctx, userID)
-		if err != nil {
-			helpers.Error(w, http.StatusForbidden, "school not found")
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	offset, _ := strconv.Atoi(q.Get("offset"))
+
+	var pedExpPtr, totalExpPtr *int
+	if v := q.Get("ped_experience"); v != "" {
+		if x, err := strconv.Atoi(v); err == nil {
+			pedExpPtr = &x
+		}
+	}
+	if v := q.Get("total_experience"); v != "" {
+		if x, err := strconv.Atoi(v); err == nil {
+			totalExpPtr = &x
+		}
+	}
+
+	filter := repository.StaffFilter{
+		FullName:        q.Get("full_name"),
+		Phone:           q.Get("phone"),
+		Position:        q.Get("position"),
+		Subject:         q.Get("subject"),
+		Education:       q.Get("education"),
+		Category:        q.Get("category"),
+		PedExperience:   pedExpPtr,
+		TotalExperience: totalExpPtr,
+		Limit:           limit,
+		Offset:          offset,
+	}
+
+	list, err := h.svc.GetAll(ctx, role, userID, filter)
+	if err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
 			return
 		}
-		schoolID = &school.ID
-	}
-
-	if role != "roo" && role != "school" {
-		helpers.Error(w, http.StatusForbidden, "access denied")
-		return
-	}
-
-	// Фильтры
-	filter := repository.StaffFilter{
-		FullName:  r.URL.Query().Get("full_name"),
-		Phone:     r.URL.Query().Get("phone"),
-		Position:  r.URL.Query().Get("position"),
-		Subject:   r.URL.Query().Get("subject"),
-		Education: r.URL.Query().Get("education"),
-		Category:  r.URL.Query().Get("category"),
-	}
-
-	list, err := h.svc.GetAll(ctx, schoolID, filter)
-	if err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "failed to get staff")
 		return
 	}
@@ -226,15 +245,11 @@ func (h *StaffHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	schoolRepo := repository.NewSchoolRepository(h.svc.RepoDB())
-	school, err := schoolRepo.GetByUserID(ctx, userID)
-	if err != nil {
-		helpers.Error(w, http.StatusForbidden, "school not found")
-		return
-	}
-	s.SchoolID = school.ID
-
-	if err := h.svc.Create(ctx, &s); err != nil {
+	if err := h.svc.Create(ctx, &s, role, userID); err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
+			return
+		}
 		helpers.Error(w, http.StatusInternalServerError, "failed to create staff")
 		return
 	}
@@ -250,6 +265,7 @@ func (h *StaffHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Security BearerAuth
 // @Success 200 {object} map[string]string
 // @Failure 403 {object} helpers.ErrorResponse
+// @Failure 404 {object} helpers.ErrorResponse
 // @Failure 500 {object} helpers.ErrorResponse
 // @Router /staff/{id} [delete]
 func (h *StaffHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -259,21 +275,20 @@ func (h *StaffHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	userID := int(claims["user_id"].(float64))
 
 	id, _ := strconv.Atoi(chi.URLParam(r, "id"))
-	schoolID := 0
 
-	if role == "school" {
-		schoolRepo := repository.NewSchoolRepository(h.svc.RepoDB())
-		school, err := schoolRepo.GetByUserID(ctx, userID)
-		if err != nil {
-			helpers.Error(w, http.StatusForbidden, "school not found")
+	ok, err := h.svc.Delete(ctx, id, role, userID)
+	if err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
 			return
 		}
-		schoolID = school.ID
-	}
-
-	if err := h.svc.Delete(ctx, id, schoolID); err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "failed to delete staff")
 		return
 	}
+	if !ok {
+		helpers.Error(w, http.StatusNotFound, "staff not found")
+		return
+	}
+
 	helpers.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }

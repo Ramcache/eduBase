@@ -30,6 +30,10 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*models
 	return &u, nil
 }
 
+func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
+	return r.FindByEmail(ctx, email)
+}
+
 func (r *UserRepository) Create(ctx context.Context, u *models.User) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO users (email, password, role)

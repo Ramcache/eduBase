@@ -64,6 +64,10 @@ definitions:
         type: string
       student_count:
         type: integer
+      user:
+        $ref: '#/definitions/models.UserInfo'
+      user_id:
+        type: integer
     type: object
   models.Staff:
     properties:
@@ -87,6 +91,8 @@ definitions:
         type: string
       school_id:
         type: integer
+      subject:
+        type: string
       total_experience:
         type: integer
       work_start:
@@ -100,6 +106,8 @@ definitions:
     properties:
       classes:
         type: integer
+      schools:
+        type: integer
       staff_total:
         type: integer
       students:
@@ -112,6 +120,8 @@ definitions:
       address:
         type: string
       birth_date:
+        type: string
+      class:
         type: string
       class_id:
         type: integer
@@ -131,6 +141,17 @@ definitions:
         type: integer
     required:
     - full_name
+    type: object
+  models.UserInfo:
+    properties:
+      email:
+        type: string
+      id:
+        type: integer
+      password:
+        type: string
+      role:
+        type: string
     type: object
 info:
   contact: {}
@@ -339,16 +360,15 @@ paths:
       summary: Обновить класс
       tags:
       - Classes
-  /roo/register_school:
+  /roo/register-school:
     post:
       consumes:
       - application/json
-      description: Доступно только для ROO. Создаёт пользователя с ролью `school`
-        и запись в таблице `schools`.
+      description: Создаёт школу и генерирует пароль автоматически.
       parameters:
-      - description: Данные новой школы
+      - description: Данные для регистрации
         in: body
-        name: request
+        name: input
         required: true
         schema:
           $ref: '#/definitions/handlers.registerSchoolRequest'
@@ -356,7 +376,7 @@ paths:
       - application/json
       responses:
         "201":
-          description: '{"status": "school registered"}'
+          description: Created
           schema:
             additionalProperties:
               type: string
@@ -365,21 +385,13 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/helpers.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/helpers.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/helpers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/helpers.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Регистрация новой школы
+      summary: Регистрация школы (ROO)
       tags:
       - ROO
   /roo/schools:
@@ -394,6 +406,10 @@ paths:
             items:
               $ref: '#/definitions/models.School'
             type: array
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -421,6 +437,10 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -445,6 +465,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/models.School'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -487,6 +511,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/helpers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -496,9 +524,73 @@ paths:
       summary: Обновить школу
       tags:
       - Schools
+  /school/me:
+    get:
+      description: Только для пользователей с ролью School
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.School'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Получить данные своей школы
+      tags:
+      - Schools
+    put:
+      consumes:
+      - application/json
+      description: Только для пользователей с ролью School
+      parameters:
+      - description: Поля для обновления
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.School'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Обновить данные своей школы
+      tags:
+      - Schools
   /staff:
     get:
-      description: ROO — все, School — только свои. Поддерживает фильтры по всем полям.
+      description: ROO — всех, School — только своих
       parameters:
       - description: ФИО
         in: query
@@ -512,6 +604,10 @@ paths:
         in: query
         name: position
         type: string
+      - description: Предмет
+        in: query
+        name: subject
+        type: string
       - description: Образование
         in: query
         name: education
@@ -520,6 +616,22 @@ paths:
         in: query
         name: category
         type: string
+      - description: Минимальный пед. стаж
+        in: query
+        name: ped_experience
+        type: integer
+      - description: Минимальный общий стаж
+        in: query
+        name: total_experience
+        type: integer
+      - description: Лимит на страницу
+        in: query
+        name: limit
+        type: integer
+      - description: Смещение
+        in: query
+        name: offset
+        type: integer
       produces:
       - application/json
       responses:
@@ -591,6 +703,10 @@ paths:
             type: object
         "403":
           description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/helpers.ErrorResponse'
         "500":
@@ -702,7 +818,7 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: schools, classes, students, teachers, staff_total
           schema:
             $ref: '#/definitions/models.StatsSummary'
         "400":
@@ -736,6 +852,14 @@ paths:
       - description: ID класса
         in: query
         name: class_id
+        type: integer
+      - description: Лимит на страницу
+        in: query
+        name: limit
+        type: integer
+      - description: Смещение
+        in: query
+        name: offset
         type: integer
       produces:
       - application/json
@@ -804,6 +928,14 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:

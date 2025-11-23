@@ -54,19 +54,14 @@ func (h *StudentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	role := claims["role"].(string)
 	userID := int(claims["user_id"].(float64))
 
-	st, err := h.svc.GetByID(ctx, id)
+	st, err := h.svc.GetByID(ctx, id, role, userID)
 	if err != nil {
-		helpers.Error(w, http.StatusNotFound, "student not found")
-		return
-	}
-
-	if role == "school" {
-		schoolRepo := repository.NewSchoolRepository(h.svc.SchoolRepoDB())
-		school, err := schoolRepo.GetByUserID(ctx, userID)
-		if err != nil || st.SchoolID != school.ID {
+		if err.Error() == "access denied" {
 			helpers.Error(w, http.StatusForbidden, "access denied")
 			return
 		}
+		helpers.Error(w, http.StatusNotFound, "student not found")
+		return
 	}
 
 	helpers.JSON(w, http.StatusOK, st)
@@ -103,23 +98,17 @@ func (h *StudentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if role == "school" {
-		schoolRepo := repository.NewSchoolRepository(h.svc.SchoolRepoDB())
-		school, err := schoolRepo.GetByUserID(ctx, userID)
-		if err != nil {
-			helpers.Error(w, http.StatusForbidden, "school not found")
+	ok, err := h.svc.Update(ctx, id, &s, role, userID)
+	if err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
 			return
 		}
-		s.SchoolID = school.ID
-	}
-
-	ok, err := h.svc.Update(ctx, id, &s, role)
-	if err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "failed to update student")
 		return
 	}
 	if !ok {
-		helpers.Error(w, http.StatusNotFound, "student not found or not yours")
+		helpers.Error(w, http.StatusNotFound, "student not found")
 		return
 	}
 
@@ -136,14 +125,16 @@ func (h *StudentHandler) Update(w http.ResponseWriter, r *http.Request) {
 // @Failure 403 {object} helpers.ErrorResponse
 // @Router /students/stats [get]
 func (h *StudentHandler) GetStats(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
 	_, claims, _ := jwtauth.FromContext(r.Context())
 	role := claims["role"].(string)
-	if role != "roo" {
-		helpers.Error(w, http.StatusForbidden, "access denied")
-		return
-	}
-	stats, err := h.svc.GetStats(context.Background())
+
+	stats, err := h.svc.GetStats(ctx, role)
 	if err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
+			return
+		}
 		helpers.Error(w, http.StatusInternalServerError, "failed to get stats")
 		return
 	}
@@ -158,15 +149,16 @@ func (h *StudentHandler) GetStats(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {string} string "csv file"
 // @Router /students/export [get]
 func (h *StudentHandler) ExportCSV(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
 	_, claims, _ := jwtauth.FromContext(r.Context())
 	role := claims["role"].(string)
+	userID := int(claims["user_id"].(float64))
 	if role != "roo" {
 		helpers.Error(w, http.StatusForbidden, "access denied")
 		return
 	}
 
-	ctx := context.Background()
-	list, err := h.svc.GetAll(ctx, nil, repository.StudentFilter{})
+	list, err := h.svc.GetAll(ctx, role, userID, repository.StudentFilter{})
 	if err != nil {
 		helpers.Error(w, http.StatusInternalServerError, "failed to export")
 		return
@@ -196,6 +188,8 @@ func deref(p *string) string {
 // @Param full_name query string false "ФИО"
 // @Param gender query string false "Пол (male/female)"
 // @Param class_id query int false "ID класса"
+// @Param limit query int false "Лимит на страницу"
+// @Param offset query int false "Смещение"
 // @Security BearerAuth
 // @Success 200 {array} models.Student
 // @Failure 500 {object} helpers.ErrorResponse
@@ -206,28 +200,28 @@ func (h *StudentHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	role := claims["role"].(string)
 	userID := int(claims["user_id"].(float64))
 
-	var schoolID *int
-	if role == "school" {
-		schoolRepo := repository.NewSchoolRepository(h.svc.SchoolRepoDB())
-		school, err := schoolRepo.GetByUserID(ctx, userID)
-		if err != nil {
-			helpers.Error(w, http.StatusForbidden, "school not found")
-			return
-		}
-		schoolID = &school.ID
-	}
+	q := r.URL.Query()
+
+	limit, _ := strconv.Atoi(q.Get("limit"))
+	offset, _ := strconv.Atoi(q.Get("offset"))
 
 	f := repository.StudentFilter{
-		FullName: r.URL.Query().Get("full_name"),
-		Gender:   r.URL.Query().Get("gender"),
+		FullName: q.Get("full_name"),
+		Gender:   q.Get("gender"),
+		Limit:    limit,
+		Offset:   offset,
 	}
-	if v := r.URL.Query().Get("class_id"); v != "" {
+	if v := q.Get("class_id"); v != "" {
 		id, _ := strconv.Atoi(v)
 		f.ClassID = &id
 	}
 
-	list, err := h.svc.GetAll(ctx, schoolID, f)
+	list, err := h.svc.GetAll(ctx, role, userID, f)
 	if err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
+			return
+		}
 		helpers.Error(w, http.StatusInternalServerError, "failed to get students")
 		return
 	}
@@ -252,11 +246,6 @@ func (h *StudentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	role := claims["role"].(string)
 	userID := int(claims["user_id"].(float64))
 
-	if role != "school" {
-		helpers.Error(w, http.StatusForbidden, "only schools can add students")
-		return
-	}
-
 	var s models.Student
 	if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
 		helpers.Error(w, http.StatusBadRequest, "invalid request")
@@ -268,15 +257,11 @@ func (h *StudentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	schoolRepo := repository.NewSchoolRepository(h.svc.SchoolRepoDB())
-	school, err := schoolRepo.GetByUserID(ctx, userID)
-	if err != nil {
-		helpers.Error(w, http.StatusForbidden, "school not found")
-		return
-	}
-	s.SchoolID = school.ID
-
-	if err := h.svc.Create(ctx, &s); err != nil {
+	if err := h.svc.Create(ctx, &s, role, userID); err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "only schools can add students")
+			return
+		}
 		helpers.Error(w, http.StatusInternalServerError, "failed to create student")
 		return
 	}
@@ -289,27 +274,29 @@ func (h *StudentHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Param id path int true "ID ученика"
 // @Security BearerAuth
 // @Success 200 {object} map[string]string
+// @Failure 403 {object} helpers.ErrorResponse
+// @Failure 404 {object} helpers.ErrorResponse
 // @Failure 500 {object} helpers.ErrorResponse
 // @Router /students/{id} [delete]
 func (h *StudentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	_, claims, _ := jwtauth.FromContext(r.Context())
+	role := claims["role"].(string)
 	userID := int(claims["user_id"].(float64))
 
 	id, _ := strconv.Atoi(chi.URLParam(r, "id"))
-	schoolRepo := repository.NewSchoolRepository(h.svc.SchoolRepoDB())
-	school, err := schoolRepo.GetByUserID(ctx, userID)
+
+	ok, err := h.svc.Delete(ctx, id, role, userID)
 	if err != nil {
-		helpers.Error(w, http.StatusForbidden, "school not found")
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
+			return
+		}
+		helpers.Error(w, http.StatusInternalServerError, "failed to delete student")
 		return
 	}
-
-	// определяем class_id для корректного обновления счётчиков
-	var classID int
-	h.svc.ClassRepoDB().QueryRow(ctx, `SELECT class_id FROM students WHERE id=$1`, id).Scan(&classID)
-
-	if err := h.svc.Delete(ctx, id, school.ID, classID); err != nil {
-		helpers.Error(w, http.StatusInternalServerError, "failed to delete student")
+	if !ok {
+		helpers.Error(w, http.StatusNotFound, "student not found")
 		return
 	}
 	helpers.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})

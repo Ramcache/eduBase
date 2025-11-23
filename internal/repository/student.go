@@ -8,13 +8,15 @@ import (
 
 	"eduBase/internal/models"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type StudentFilter struct {
 	FullName string
 	Gender   string
 	ClassID  *int
+
+	Limit  int
+	Offset int
 }
 
 type StudentRepository struct {
@@ -26,6 +28,10 @@ func NewStudentRepository(db *pgx.Conn) *StudentRepository {
 }
 
 var ErrStudentNotFound = errors.New("student not found")
+
+func (r *StudentRepository) DB() *pgx.Conn {
+	return r.db
+}
 
 // ===== CREATE =====
 func (r *StudentRepository) Create(ctx context.Context, s *models.Student) error {
@@ -39,7 +45,7 @@ func (r *StudentRepository) Create(ctx context.Context, s *models.Student) error
 	).Scan(&s.ID, &s.CreatedAt)
 }
 
-// ===== GET ALL (with class name) =====
+// ===== GET ALL (with class name, filters, pagination) =====
 func (r *StudentRepository) GetAll(ctx context.Context, schoolID *int, f StudentFilter) ([]models.Student, error) {
 	base := `
 	SELECT s.id, s.full_name, s.birth_date, s.gender, s.phone, s.address, s.note,
@@ -76,6 +82,18 @@ func (r *StudentRepository) GetAll(ctx context.Context, schoolID *int, f Student
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
 	query += " ORDER BY s.full_name"
+
+	// пагинация
+	if f.Limit > 0 {
+		query += fmt.Sprintf(" LIMIT $%d", i)
+		args = append(args, f.Limit)
+		i++
+	}
+	if f.Offset > 0 {
+		query += fmt.Sprintf(" OFFSET $%d", i)
+		args = append(args, f.Offset)
+		i++
+	}
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -121,33 +139,29 @@ func (r *StudentRepository) GetByID(ctx context.Context, id int) (*models.Studen
 	return &s, nil
 }
 
-// ===== UPDATE =====
-func (r *StudentRepository) Update(ctx context.Context, id int, s *models.Student, role string) (int64, error) {
-	var res pgconn.CommandTag
-	var err error
-	if role == "roo" {
-		res, err = r.db.Exec(ctx, `
+// ===== UPDATE (без знания о роли / school_id) =====
+func (r *StudentRepository) Update(ctx context.Context, id int, s *models.Student) (int64, error) {
+	res, err := r.db.Exec(ctx, `
 			UPDATE students
-			SET full_name=$1, birth_date=$2, gender=$3, phone=$4, address=$5, note=$6, class_id=$7
+			SET full_name=$1, birth_date=$2, gender=$3, phone=$4,
+			    address=$5, note=$6, class_id=$7
 			WHERE id=$8`,
-			s.FullName, s.BirthDate, s.Gender, s.Phone, s.Address, s.Note, s.ClassID, id)
-	} else {
-		res, err = r.db.Exec(ctx, `
-			UPDATE students
-			SET full_name=$1, birth_date=$2, gender=$3, phone=$4, address=$5, note=$6, class_id=$7
-			WHERE id=$8 AND school_id=$9`,
-			s.FullName, s.BirthDate, s.Gender, s.Phone, s.Address, s.Note, s.ClassID, id, s.SchoolID)
-	}
+		s.FullName, s.BirthDate, s.Gender, s.Phone,
+		s.Address, s.Note, s.ClassID, id,
+	)
 	if err != nil {
 		return 0, err
 	}
 	return res.RowsAffected(), nil
 }
 
-// ===== DELETE =====
-func (r *StudentRepository) Delete(ctx context.Context, id int, schoolID int) error {
-	_, err := r.db.Exec(ctx, `DELETE FROM students WHERE id=$1 AND school_id=$2`, id, schoolID)
-	return err
+// ===== DELETE (без school_id) =====
+func (r *StudentRepository) Delete(ctx context.Context, id int) (int64, error) {
+	res, err := r.db.Exec(ctx, `DELETE FROM students WHERE id=$1`, id)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected(), nil
 }
 
 // ===== COUNT BY CLASS =====
