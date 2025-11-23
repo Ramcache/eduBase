@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/xuri/excelize/v2"
 	"net/http"
 	"strconv"
 	"time"
@@ -30,8 +31,10 @@ func (h *StudentHandler) Routes(r chi.Router) {
 		r.Get("/", h.GetAll)
 		r.Get("/{id}", h.GetByID)
 		r.Get("/stats", h.GetStats)
+		r.Get("/import/template", h.ImportTemplate)
 		r.Get("/export", h.ExportCSV)
 		r.Post("/", h.Create)
+		r.Post("/import", h.ImportExcel)
 		r.Put("/{id}", h.Update)
 		r.Delete("/{id}", h.Delete)
 	})
@@ -300,4 +303,209 @@ func (h *StudentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	helpers.JSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+// ImportExcel godoc
+// @Summary Импорт учеников из Excel
+// @Description School — только в свою школу; ROO тоже можно использовать.
+// @Tags Students
+// @Accept multipart/form-data
+// @Produce json
+// @Param file formData file true "Excel файл (.xlsx)"
+// @Param strict query bool false "Строгий режим: если есть ошибки — никого не импортировать"
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} helpers.ErrorResponse
+// @Failure 403 {object} helpers.ErrorResponse
+// @Failure 500 {object} helpers.ErrorResponse
+// @Router /students/import [post]
+func (h *StudentHandler) ImportExcel(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	role := claims["role"].(string)
+	userID := int(claims["user_id"].(float64))
+
+	if role != "roo" && role != "school" {
+		helpers.Error(w, http.StatusForbidden, "access denied")
+		return
+	}
+
+	strict := r.URL.Query().Get("strict") == "1"
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		helpers.Error(w, http.StatusBadRequest, "file is required")
+		return
+	}
+	defer file.Close()
+
+	f, err := excelize.OpenReader(file)
+	if err != nil {
+		helpers.Error(w, http.StatusBadRequest, "invalid excel file")
+		return
+	}
+	defer f.Close()
+
+	sheetName := f.GetSheetName(0)
+	if sheetName == "" {
+		helpers.Error(w, http.StatusBadRequest, "empty excel")
+		return
+	}
+	rows, err := f.GetRows(sheetName)
+	if err != nil {
+		helpers.Error(w, http.StatusBadRequest, "failed to read rows")
+		return
+	}
+	if len(rows) < 2 {
+		helpers.Error(w, http.StatusBadRequest, "file has no data")
+		return
+	}
+
+	headerRow := rows[0]
+	colIndex := map[string]int{}
+	for i, col := range headerRow {
+		colIndex[col] = i
+	}
+
+	required := []string{"full_name", "class_id"}
+	for _, col := range required {
+		if _, ok := colIndex[col]; !ok {
+			helpers.Error(w, http.StatusBadRequest, "missing column: "+col)
+			return
+		}
+	}
+
+	type RowError struct {
+		Row   int    `json:"row"`
+		Error string `json:"error"`
+	}
+	type rowData struct {
+		rowNum  int
+		student models.Student
+	}
+
+	var (
+		parsedRows []rowData
+		errorsList []RowError
+	)
+
+	// === 1. Парсинг и валидация ===
+	for i, row := range rows[1:] {
+		lineNum := i + 2
+
+		get := func(name string) string {
+			idx, ok := colIndex[name]
+			if !ok || idx >= len(row) {
+				return ""
+			}
+			return row[idx]
+		}
+
+		st := models.Student{
+			FullName: get("full_name"),
+			Phone:    strPtr(get("phone")),
+			Address:  strPtr(get("address")),
+			Note:     strPtr(get("note")),
+		}
+
+		if v := get("gender"); v != "" {
+			g := v
+			st.Gender = &g
+		}
+		if v := get("birth_date"); v != "" {
+			if t, err := time.Parse("2006-01-02", v); err == nil {
+				st.BirthDate = &t
+			} else {
+				errorsList = append(errorsList, RowError{Row: lineNum, Error: "invalid birth_date, expected YYYY-MM-DD"})
+				continue
+			}
+		}
+		if v := get("class_id"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil {
+				st.ClassID = n
+			} else {
+				errorsList = append(errorsList, RowError{Row: lineNum, Error: "invalid class_id"})
+				continue
+			}
+		}
+
+		if st.FullName == "" || st.ClassID == 0 {
+			errorsList = append(errorsList, RowError{Row: lineNum, Error: "full_name and class_id required"})
+			continue
+		}
+
+		parsedRows = append(parsedRows, rowData{rowNum: lineNum, student: st})
+	}
+
+	if strict && len(errorsList) > 0 {
+		helpers.JSON(w, http.StatusBadRequest, map[string]interface{}{
+			"file":        header.Filename,
+			"created":     0,
+			"errorsCount": len(errorsList),
+			"errors":      errorsList,
+			"strict":      true,
+		})
+		return
+	}
+
+	// === 2. Создание через сервис ===
+	created := 0
+	for _, item := range parsedRows {
+		if err := h.svc.Create(ctx, &item.student, role, userID); err != nil {
+			if strict {
+				errorsList = append(errorsList, RowError{Row: item.rowNum, Error: err.Error()})
+				break
+			}
+			errorsList = append(errorsList, RowError{Row: item.rowNum, Error: err.Error()})
+			continue
+		}
+		created++
+	}
+
+	status := http.StatusOK
+	if strict && created == 0 && len(errorsList) > 0 {
+		status = http.StatusBadRequest
+	}
+
+	helpers.JSON(w, status, map[string]interface{}{
+		"file":        header.Filename,
+		"created":     created,
+		"errorsCount": len(errorsList),
+		"errors":      errorsList,
+		"strict":      strict,
+	})
+}
+
+// ImportTemplate godoc
+// @Summary Скачать шаблон Excel для импорта учеников
+// @Tags Students
+// @Produce application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+// @Security BearerAuth
+// @Success 200 {file} binary "Excel файл"
+// @Router /students/import/template [get]
+func (h *StudentHandler) ImportTemplate(w http.ResponseWriter, r *http.Request) {
+	f := excelize.NewFile()
+	sheet := f.GetSheetName(0)
+
+	headers := []string{
+		"full_name",
+		"birth_date", // YYYY-MM-DD
+		"gender",     // male/female
+		"phone",
+		"address",
+		"note",
+		"class_id",
+	}
+	for i, hname := range headers {
+		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+		f.SetCellValue(sheet, cell, hname)
+	}
+
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", "attachment; filename=students_import_template.xlsx")
+
+	if err := f.Write(w); err != nil {
+		helpers.Error(w, http.StatusInternalServerError, "failed to write template")
+		return
+	}
 }

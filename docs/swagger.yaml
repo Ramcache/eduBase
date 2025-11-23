@@ -784,6 +784,61 @@ paths:
       summary: Обновить данные сотрудника
       tags:
       - Staff
+  /staff/import:
+    post:
+      consumes:
+      - multipart/form-data
+      description: School — только в свою школу; ROO — может импортировать для любой
+        школы (по логике сервиса).
+      parameters:
+      - description: Excel файл (.xlsx)
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: 'Строгий режим: если есть ошибки — никого не импортировать'
+        in: query
+        name: strict
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Импорт сотрудников из Excel
+      tags:
+      - Staff
+  /staff/import/template:
+    get:
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: Excel файл
+          schema:
+            type: file
+      security:
+      - BearerAuth: []
+      summary: Скачать шаблон Excel для импорта сотрудников
+      tags:
+      - Staff
   /staff/stats:
     get:
       description: Кол-во сотрудников по должностям
@@ -1025,6 +1080,60 @@ paths:
       security:
       - BearerAuth: []
       summary: Экспорт учеников в CSV (только ROO)
+      tags:
+      - Students
+  /students/import:
+    post:
+      consumes:
+      - multipart/form-data
+      description: School — только в свою школу; ROO тоже можно использовать.
+      parameters:
+      - description: Excel файл (.xlsx)
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: 'Строгий режим: если есть ошибки — никого не импортировать'
+        in: query
+        name: strict
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Импорт учеников из Excel
+      tags:
+      - Students
+  /students/import/template:
+    get:
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: Excel файл
+          schema:
+            type: file
+      security:
+      - BearerAuth: []
+      summary: Скачать шаблон Excel для импорта учеников
       tags:
       - Students
   /students/stats:
