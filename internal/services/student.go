@@ -188,3 +188,24 @@ func (s *StudentService) UpdateCounts(ctx context.Context, schoolID, classID int
 		WHERE id=$1`, schoolID)
 	return err
 }
+
+// services/student.go
+
+func (s *StudentService) GetGradeStats(ctx context.Context, role string, userID int, gradeFrom, gradeTo *int) (int, int, error) {
+	var schoolID *int
+
+	switch role {
+	case "roo":
+		// видит всех — без фильтра по школе
+	case "school":
+		school, err := s.schoolRepo.GetByUserID(ctx, userID)
+		if err != nil {
+			return 0, 0, err
+		}
+		schoolID = &school.ID
+	default:
+		return 0, 0, errors.New("access denied")
+	}
+
+	return s.repo.GetGradeStats(ctx, schoolID, gradeFrom, gradeTo)
+}

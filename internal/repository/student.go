@@ -10,15 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type StudentFilter struct {
-	FullName string
-	Gender   string
-	ClassID  *int
-
-	Limit  int
-	Offset int
-}
-
 type StudentRepository struct {
 	db *pgx.Conn
 }
@@ -31,6 +22,18 @@ var ErrStudentNotFound = errors.New("student not found")
 
 func (r *StudentRepository) DB() *pgx.Conn {
 	return r.db
+}
+
+type StudentFilter struct {
+	FullName string
+	Gender   string
+	ClassID  *int
+
+	GradeFrom *int
+	GradeTo   *int
+
+	Limit  int
+	Offset int
 }
 
 // ===== CREATE =====
@@ -76,6 +79,16 @@ func (r *StudentRepository) GetAll(ctx context.Context, schoolID *int, f Student
 		args = append(args, *f.ClassID)
 		i++
 	}
+	if f.GradeFrom != nil {
+		where = append(where, fmt.Sprintf("c.grade >= $%d", i))
+		args = append(args, *f.GradeFrom)
+		i++
+	}
+	if f.GradeTo != nil {
+		where = append(where, fmt.Sprintf("c.grade <= $%d", i))
+		args = append(args, *f.GradeTo)
+		i++
+	}
 
 	query := base
 	if len(where) > 0 {
@@ -83,7 +96,6 @@ func (r *StudentRepository) GetAll(ctx context.Context, schoolID *int, f Student
 	}
 	query += " ORDER BY s.full_name"
 
-	// пагинация
 	if f.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT $%d", i)
 		args = append(args, f.Limit)
@@ -189,4 +201,78 @@ func (r *StudentRepository) GetStats(ctx context.Context) (map[string]int, error
 		stats[g] = c
 	}
 	return stats, nil
+}
+
+func (r *StudentRepository) GetGradeStats(ctx context.Context, schoolID *int, gradeFrom, gradeTo *int) (int, int, error) {
+	var (
+		classCount    int
+		studentCount  int
+		args          []any
+		whereClasses  []string
+		whereStudents []string
+		iClasses      = 1
+		iStudents     = 1
+	)
+
+	// ==== классы ====
+	classQuery := `SELECT COUNT(*) FROM classes c`
+	if schoolID != nil {
+		whereClasses = append(whereClasses, fmt.Sprintf("c.school_id=$%d", iClasses))
+		args = append(args, *schoolID)
+		iClasses++
+	}
+	if gradeFrom != nil {
+		whereClasses = append(whereClasses, fmt.Sprintf("c.grade >= $%d", iClasses))
+		args = append(args, *gradeFrom)
+		iClasses++
+	}
+	if gradeTo != nil {
+		whereClasses = append(whereClasses, fmt.Sprintf("c.grade <= $%d", iClasses))
+		args = append(args, *gradeTo)
+		iClasses++
+	}
+	if len(whereClasses) > 0 {
+		classQuery += " WHERE " + strings.Join(whereClasses, " AND ")
+	}
+
+	// т.к. у нас общий args, проще отдельно выполнить запросы:
+	// сделаем два отдельных блока с локальными args.
+
+	// ---- классы ----
+	var classArgs []any
+	classArgs = append(classArgs, args...)
+	if err := r.db.QueryRow(ctx, classQuery, classArgs...).Scan(&classCount); err != nil {
+		return 0, 0, err
+	}
+
+	// ==== ученики ====
+	studentQuery := `
+		SELECT COUNT(*)
+		FROM students s
+		JOIN classes c ON c.id = s.class_id`
+	args = nil
+	if schoolID != nil {
+		whereStudents = append(whereStudents, fmt.Sprintf("s.school_id=$%d", iStudents))
+		args = append(args, *schoolID)
+		iStudents++
+	}
+	if gradeFrom != nil {
+		whereStudents = append(whereStudents, fmt.Sprintf("c.grade >= $%d", iStudents))
+		args = append(args, *gradeFrom)
+		iStudents++
+	}
+	if gradeTo != nil {
+		whereStudents = append(whereStudents, fmt.Sprintf("c.grade <= $%d", iStudents))
+		args = append(args, *gradeTo)
+		iStudents++
+	}
+	if len(whereStudents) > 0 {
+		studentQuery += " WHERE " + strings.Join(whereStudents, " AND ")
+	}
+
+	if err := r.db.QueryRow(ctx, studentQuery, args...).Scan(&studentCount); err != nil {
+		return 0, 0, err
+	}
+
+	return classCount, studentCount, nil
 }

@@ -31,6 +31,7 @@ func (h *StudentHandler) Routes(r chi.Router) {
 		r.Get("/", h.GetAll)
 		r.Get("/{id}", h.GetByID)
 		r.Get("/stats", h.GetStats)
+		r.Get("/grade-stats", h.GetGradeStats)
 		r.Get("/import/template", h.ImportTemplate)
 		r.Get("/export", h.ExportCSV)
 		r.Post("/", h.Create)
@@ -191,6 +192,8 @@ func deref(p *string) string {
 // @Param full_name query string false "ФИО"
 // @Param gender query string false "Пол (male/female)"
 // @Param class_id query int false "ID класса"
+// @Param grade_from query int false "Нижняя граница класса (номер)"
+// @Param grade_to query int false "Верхняя граница класса (номер)"
 // @Param limit query int false "Лимит на страницу"
 // @Param offset query int false "Смещение"
 // @Security BearerAuth
@@ -208,15 +211,33 @@ func (h *StudentHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(q.Get("limit"))
 	offset, _ := strconv.Atoi(q.Get("offset"))
 
-	f := repository.StudentFilter{
-		FullName: q.Get("full_name"),
-		Gender:   q.Get("gender"),
-		Limit:    limit,
-		Offset:   offset,
-	}
+	var classIDPtr *int
 	if v := q.Get("class_id"); v != "" {
-		id, _ := strconv.Atoi(v)
-		f.ClassID = &id
+		if id, err := strconv.Atoi(v); err == nil {
+			classIDPtr = &id
+		}
+	}
+
+	var gradeFromPtr, gradeToPtr *int
+	if v := q.Get("grade_from"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			gradeFromPtr = &n
+		}
+	}
+	if v := q.Get("grade_to"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			gradeToPtr = &n
+		}
+	}
+
+	f := repository.StudentFilter{
+		FullName:  q.Get("full_name"),
+		Gender:    q.Get("gender"),
+		ClassID:   classIDPtr,
+		GradeFrom: gradeFromPtr,
+		GradeTo:   gradeToPtr,
+		Limit:     limit,
+		Offset:    offset,
 	}
 
 	list, err := h.svc.GetAll(ctx, role, userID, f)
@@ -508,4 +529,52 @@ func (h *StudentHandler) ImportTemplate(w http.ResponseWriter, r *http.Request) 
 		helpers.Error(w, http.StatusInternalServerError, "failed to write template")
 		return
 	}
+}
+
+// GetGradeStats godoc
+// @Summary Получить статистику по диапазону классов
+// @Description Возвращает количество классов и учеников в заданном диапазоне классов.
+// @Tags Students
+// @Produce json
+// @Param grade_from query int false "Нижняя граница класса (номер)"
+// @Param grade_to query int false "Верхняя граница класса (номер)"
+// @Security BearerAuth
+// @Success 200 {object} map[string]int
+// @Failure 403 {object} helpers.ErrorResponse
+// @Failure 500 {object} helpers.ErrorResponse
+// @Router /students/grade-stats [get]
+func (h *StudentHandler) GetGradeStats(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	role := claims["role"].(string)
+	userID := int(claims["user_id"].(float64))
+
+	q := r.URL.Query()
+
+	var gradeFromPtr, gradeToPtr *int
+	if v := q.Get("grade_from"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			gradeFromPtr = &n
+		}
+	}
+	if v := q.Get("grade_to"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			gradeToPtr = &n
+		}
+	}
+
+	classesCount, studentsCount, err := h.svc.GetGradeStats(ctx, role, userID, gradeFromPtr, gradeToPtr)
+	if err != nil {
+		if err.Error() == "access denied" {
+			helpers.Error(w, http.StatusForbidden, "access denied")
+			return
+		}
+		helpers.Error(w, http.StatusInternalServerError, "failed to get grade stats")
+		return
+	}
+
+	helpers.JSON(w, http.StatusOK, map[string]int{
+		"classes":  classesCount,
+		"students": studentsCount,
+	})
 }
